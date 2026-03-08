@@ -1,56 +1,31 @@
-exports.handler = async (event) => {
+exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: { message: 'Method not allowed' } }) };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
-
   let body;
-  try { body = JSON.parse(event.body); } catch (e) {
-    return { statusCode: 400, body: JSON.stringify({ error: { message: 'Invalid JSON body' } }) };
-  }
-
+  try { body = JSON.parse(event.body); }
+  catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body' }) }; }
   const { key, model, payload } = body;
-
-  const apiKey = key || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: { message: 'No API key available. Set GEMINI_API_KEY in Netlify environment variables.' } })
-    };
-  }
-
-  if (!model || !payload) {
-    return { statusCode: 400, body: JSON.stringify({ error: { message: 'Missing model or payload' } }) };
-  }
-
-  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
+  if (!key) return { statusCode: 400, body: JSON.stringify({ error: 'Missing API key' }) };
+  if (!model) return { statusCode: 400, body: JSON.stringify({ error: 'Missing model' }) };
+  if (!payload) return { statusCode: 400, body: JSON.stringify({ error: 'Missing payload' }) };
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Gemini request timed out')), 25000)
+  );
   try {
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini request timed out after 25 seconds')), 25000)
-    );
-
     const geminiRes = await Promise.race([
-      fetch(targetUrl, {
+      fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }),
       timeout
     ]);
-
     const text = await geminiRes.text();
-    return {
-      statusCode: geminiRes.status,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: text,
-    };
+    return { statusCode: geminiRes.status, headers: { 'Content-Type': 'application/json' }, body: text };
   } catch (err) {
-    const isTimeout = err.message.includes('timed out');
-    return {
-      statusCode: isTimeout ? 504 : 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: { message: err.message } })
-    };
+    const is504 = err.message.includes('timed out');
+    return { statusCode: is504 ? 504 : 502, body: JSON.stringify({ error: err.message }) };
   }
 };
