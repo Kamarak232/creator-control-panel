@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creator Control Panel</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="ccp-app">
+
+  <!-- ─── Sidebar ─── -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">🎛</div>
+      <div class="sidebar-logo-text">
+        <span class="sidebar-logo-name">CCP Studio</span>
+        <span class="sidebar-logo-sub">AI Suite</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Home</div>
+      <button class="sidebar-item active" data-tab="home">
+        <span class="sidebar-icon">🏠</span> Choose Niche
+      </button>
+
+      <div class="sidebar-section-label sidebar-niche-label" id="nav-stickman-label" style="display:none;">📌 Stickman History</div>
+      <button class="sidebar-item sidebar-niche-item" data-tab="prompt" id="nav-prompt" style="display:none;">
+        <span class="sidebar-icon">🎯</span> Script Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="script" id="nav-script" style="display:none;">
+        <span class="sidebar-icon">✍️</span> Script Refiner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="images" id="nav-images" style="display:none;">
+        <span class="sidebar-icon">🖼</span> Image Planner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="veo3" id="nav-veo3" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Veo 3 Prompts
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="voice" id="nav-voice" style="display:none;">
+        <span class="sidebar-icon">🔊</span> Voice Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="compiler" id="nav-stickman-assembly" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+
+      <div class="sidebar-section-label sidebar-niche-label" id="nav-medical-label" style="display:none;">📌 Medical Curiosity</div>
+      <button class="sidebar-item sidebar-niche-item" data-tab="medical" id="nav-medical" style="display:none;">
+        <span class="sidebar-icon">🧬</span> Script Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="script" id="nav-medical-script" style="display:none;">
+        <span class="sidebar-icon">✍️</span> Script Refiner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="medimg" id="nav-medical-images" style="display:none;">
+        <span class="sidebar-icon">🖼</span> Image Planner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="veo3" id="nav-medical-veo3" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Veo 3 Prompts
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="voice" id="nav-medical-voice" style="display:none;">
+        <span class="sidebar-icon">🔊</span> Voice Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="compiler" id="nav-medical-assembly" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+      <div class="sidebar-section-label sidebar-niche-label" id="nav-history-label" style="display:none;">📌 Map History</div>
+      <button class="sidebar-item sidebar-niche-item" data-tab="history" id="nav-history" style="display:none;">
+        <span class="sidebar-icon">🗺️</span> Script Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="script" id="nav-history-script" style="display:none;">
+        <span class="sidebar-icon">✍️</span> Script Refiner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="histimg" id="nav-history-images" style="display:none;">
+        <span class="sidebar-icon">🖼</span> Image Planner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="veo3" id="nav-history-veo3" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Veo 3 Prompts
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="voice" id="nav-history-voice" style="display:none;">
+        <span class="sidebar-icon">🔊</span> Voice Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="compiler" id="nav-history-assembly" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+
+      <div class="sidebar-section-label sidebar-niche-label" id="nav-geo-label" style="display:none;">📌 Geopolitical What-If</div>
+      <button class="sidebar-item sidebar-niche-item" data-tab="geo" id="nav-geo" style="display:none;">
+        <span class="sidebar-icon">🌐</span> Script Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="script" id="nav-geo-script" style="display:none;">
+        <span class="sidebar-icon">✍️</span> Script Refiner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="geoimg" id="nav-geo-images" style="display:none;">
+        <span class="sidebar-icon">🖼</span> Image Planner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="veo3" id="nav-geo-veo3" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Veo 3 Prompts
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="voice" id="nav-geo-voice" style="display:none;">
+        <span class="sidebar-icon">🔊</span> Voice Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="compiler" id="nav-geo-assembly" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+
+      <div class="sidebar-section-label sidebar-niche-label" id="nav-other-label" style="display:none;">📌 Other Niche</div>
+      <button class="sidebar-item sidebar-niche-item" data-tab="other" id="nav-other" style="display:none;">
+        <span class="sidebar-icon">🔗</span> Video Analyzer
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="script" id="nav-other-script" style="display:none;">
+        <span class="sidebar-icon">✍️</span> Script Refiner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="otherimg" id="nav-other-images" style="display:none;">
+        <span class="sidebar-icon">🖼</span> Image Planner
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="veo3" id="nav-other-veo3" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Veo 3 Prompts
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="voice" id="nav-other-voice" style="display:none;">
+        <span class="sidebar-icon">🔊</span> Voice Generator
+      </button>
+      <button class="sidebar-item sidebar-niche-item" data-tab="compiler" id="nav-other-assembly" style="display:none;">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+
+      <div class="sidebar-section-label">Manage</div>
+      <button class="sidebar-item" data-tab="compiler">
+        <span class="sidebar-icon">🎬</span> Video Compiler
+      </button>
+      <button class="sidebar-item" data-tab="projects">
+        <span class="sidebar-icon">📁</span> Projects
+      </button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <button class="sidebar-item" data-tab="settings" style="width:100%;">
+        <span class="sidebar-icon">⚙️</span> Settings
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Main ─── -->
+  <div id="main">
+
+    <div id="topbar">
+      <div class="topbar-title-group">
+        <h1 id="page-title">Script Generator</h1>
+        <p id="page-subtitle">Generate full 15-minute scripts for your Stickman History videos</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="clear-all-btn" title="Clear all generated content and start fresh">🗑 Clear All</button>
+        <div class="topbar-badge">✦ Gemini Powered</div>
+      </div>
+    </div>
+
+    <div id="pipeline-bar" style="display:none;"></div>
+
+    <div id="ccp-content">
+
+      <!-- Niche Selection Home -->
+      <section class="ccp-panel active" id="tab-home">
+        <div style="max-width:600px;margin:0 auto;padding:20px 0;">
+          <h2 style="color:var(--text);font-family:var(--font-head);font-size:20px;font-weight:700;margin:0 0 6px;">Pick your channel niche</h2>
+          <p style="color:var(--text3);font-size:13px;margin:0 0 28px;">Select a niche to load the right tools for your channel.</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+            <button class="niche-card" data-niche="stickman" onclick="selectNiche('stickman')">
+              <div class="niche-card-icon">🗡️</div>
+              <div class="niche-card-name">POV Stickman History</div>
+              <div class="niche-card-desc">Second-person historical narratives. Immersive, cinematic, brutal. 15-minute YouTube scripts.</div>
+              <div class="niche-card-tools">Script Generator · Script Refiner · Image Planner · Veo 3 · Voice</div>
+            </button>
+
+            <button class="niche-card" data-niche="medical" onclick="selectNiche('medical')">
+              <div class="niche-card-icon">🧬</div>
+              <div class="niche-card-name">Medical Curiosity</div>
+              <div class="niche-card-desc">Body-horror medical scripts. Chubbyemu meets Kurzgesagt. Clinical, morbid, addictive.</div>
+              <div class="niche-card-tools">Script Generator · Image Planner · Veo 3 · Voice</div>
+            </button>
+
+            <button class="niche-card" data-niche="history" onclick="selectNiche('history')">
+              <div class="niche-card-icon">🗺️</div>
+              <div class="niche-card-name">Map History</div>
+              <div class="niche-card-desc">Cinematic map-style geopolitics. Vox meets Kings and Generals. 9-minute deep-dive scripts.</div>
+              <div class="niche-card-tools">Script Generator · Image Planner · Veo 3 · Voice</div>
+            </button>
+
+            <button class="niche-card" data-niche="geo" onclick="selectNiche('geo')">
+              <div class="niche-card-icon">🌐</div>
+              <div class="niche-card-name">Geopolitical What-If</div>
+              <div class="niche-card-desc">Fast-paced analytical "what happens next" scripts. Last Brain Cell meets Wendover Productions.</div>
+              <div class="niche-card-tools">Script Generator · Script Refiner · Veo 3 · Voice</div>
+            </button>
+
+            <button class="niche-card" data-niche="other" onclick="selectNiche('other')" style="grid-column:1/-1;">
+              <div class="niche-card-icon">🔗</div>
+              <div class="niche-card-name">Other Niche</div>
+              <div class="niche-card-desc">Paste any YouTube video as reference. Gemini watches it, transcribes the script, breaks down the visual style and pacing, then generates a full production pipeline to match.</div>
+              <div class="niche-card-tools">Video Analyzer · Script Generator · Image Planner · Voice · Assembly</div>
+            </button>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Script Generator -->
+      <section class="ccp-panel" id="tab-prompt">
+        <div class="glass-card">
+          <div class="glass-card-title">Episode Setup</div>
+
+          <div class="form-grid-2">
+            <div>
+              <label>Role / Subject</label>
+              <input type="text" id="prompt-role" placeholder="e.g. Roman Galley Slave" />
+            </div>
+            <div>
+              <label>Historical Setting</label>
+              <input type="text" id="prompt-setting" placeholder="e.g. 1st century AD, Rome" />
+            </div>
+          </div>
+
+          <div class="form-grid-2" style="margin-top:14px;">
+            <div>
+              <label>Subject Gender</label>
+              <select id="prompt-gender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="ambiguous">Ambiguous</option>
+              </select>
+            </div>
+            <div>
+              <label>Ending Type</label>
+              <select id="prompt-ending">
+                <option value="executed by the system">Executed by the system</option>
+                <option value="abandoned and imprisoned">Abandoned and imprisoned</option>
+                <option value="dies in the field">Dies in the field</option>
+                <option value="survives but psychologically destroyed">Survives — psychologically destroyed</option>
+                <option value="disappears into obscurity">Disappears into obscurity</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="ccp-btn secondary" id="find-topic-stickman-btn" style="margin-top:20px;width:100%;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#6ee7b7;">🔍 Find Fresh Topic</button>
+          <div id="find-topic-stickman-result" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(13,148,136,0.1);border-radius:8px;border-left:3px solid #0d9488;font-size:12px;color:#aaa;"></div>
+          <button class="ccp-btn primary" id="generate-prompt-btn" style="margin-top:12px;">
+            ⚡ Generate 15-Minute Script
+          </button>
+        </div>
+
+        <div class="ccp-output" id="prompt-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Generated Script</span>
+          </div>
+          <div class="ccp-output-body">
+            <div class="ccp-output-text" id="prompt-text"></div>
+            <div class="ccp-btn-row">
+              <button class="ccp-btn copy" id="copy-prompt-btn">📋 Copy Script</button>
+              <button class="ccp-btn save" id="save-prompt-btn">💾 Save to Project</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Script Refiner -->
+      <section class="ccp-panel" id="tab-script">
+        <div class="glass-card">
+          <div class="glass-card-title">Paste Your Script</div>
+          <textarea id="script-input" placeholder="Paste your generated script here…" style="min-height:140px;"></textarea>
+
+          <div style="margin-top:16px;">
+            <label style="margin:0 0 10px;">Refinement Options</label>
+            <div class="ccp-checks">
+              <label><input type="checkbox" id="opt-tension" checked /> Narrative Tension</label>
+              <label><input type="checkbox" id="opt-language" checked /> Cinematic Language</label>
+              <label><input type="checkbox" id="opt-pov" checked /> 2nd-Person POV</label>
+              <label><input type="checkbox" id="opt-ending" checked /> Philosophical Ending</label>
+            </div>
+          </div>
+
+          <button class="ccp-btn primary" id="optimize-script-btn" style="margin-top:20px;">
+            🎙 Refine Script
+          </button>
+        </div>
+
+        <div class="ccp-output" id="script-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Refined Script</span>
+          </div>
+          <div class="ccp-output-body">
+            <div class="ccp-output-text" id="script-text" contenteditable="true" spellcheck="false" style="outline:none;cursor:text;"></div>
+            <button class="ccp-btn copy" id="copy-script-btn">📋 Copy Script</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Image Planner -->
+      <section class="ccp-panel" id="tab-images">
+        <div class="row-between">
+          <div></div>
+          <button id="reset-images-btn" class="small-btn">↺ Reset Planner</button>
+        </div>
+
+        <input type="hidden" id="character-anchor" />
+
+        <div class="glass-card">
+          <div class="glass-card-title">Visual Setup</div>
+
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <label style="margin:0;">Visual Style</label>
+            <span id="style-lock-badge" style="display:none;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#4ade80;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);padding:2px 8px;border-radius:20px;">🔒 Locked to reference video style</span>
+          </div>
+          <select id="image-style">
+            <option value="" disabled selected>Select a visual style first…</option>
+            <option value="2D digital comedy animation style featuring a stark visual contrast between highly detailed, caricatured heads and extremely simplistic, solid stick-figure bodies. The faces are drawn with thick, prominent linework and feature exaggerated, slightly grotesque details like visible wrinkles, heavy eyelids, and deadpan or exhausted expressions. The rendering uses crisp outlines and basic cell shading. The backgrounds are simple, flatly colored 2D environments, but the scene is elevated by dramatic, moody single-source lighting that casts distinct, solid drop shadows from the characters. The overall aesthetic mimics a satirical, independently produced Flash animation or YouTube web series">2D Comedy Animation</option>
+            <option value="cinematic realistic">Cinematic / Realistic</option>
+            <option value="anime illustrated">Anime / Illustrated</option>
+            <option value="minimalist clean">Minimal / Clean</option>
+            <option value="dark dramatic">Dark / Dramatic</option>
+            <option value="luxury premium">Luxury / Premium</option>
+            <option value="cartoon stylized">Cartoon / Stylized</option>
+            <option value="watercolor painted, soft wet-on-wet washes, visible brushstrokes, delicate bleeding edges, muted earthy tones with subtle colour blooms, traditional illustration aesthetic">Watercolor</option>
+          </select>
+
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);">
+            <div style="font-size:11px;font-weight:700;color:#c084fc;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Style</div>
+            <label style="margin-top:0;">Style Reference</label>
+            <p style="font-size:11px;color:var(--text2);margin:2px 0 8px;line-height:1.5;">Paste a YouTube URL or image URL. Gemini scans it and locks every image prompt to that exact visual style.</p>
+            <div style="display:flex;gap:8px;">
+              <input type="url" id="style-reference-url" placeholder="YouTube URL or image URL…" style="flex:1;margin:0;" />
+              <button class="ccp-btn ghost" id="extract-style-ref-btn" style="margin:0;width:auto;padding:0 14px;white-space:nowrap;flex-shrink:0;">🔍 Extract Style</button>
+            </div>
+            <div id="style-ref-preview" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.25);border-radius:8px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:10px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:.07em;">🔒 Style Locked</span>
+                <button id="clear-style-ref-btn" style="font-size:11px;color:#6b7280;background:none;border:none;cursor:pointer;padding:0;">✕ Clear</button>
+              </div>
+              <div id="style-ref-text" style="font-size:11px;color:#c4b5fd;line-height:1.6;white-space:pre-wrap;"></div>
+            </div>
+          </div>
+
+          <label>Main Character Look</label>
+          <button class="ccp-btn ghost" id="suggest-anchor-btn" style="margin-top:4px;margin-bottom:8px;">✨ Suggest 3 Character Looks</button>
+          <div id="anchor-options" style="display:none;margin-bottom:4px;"></div>
+
+          <label>Number of Images</label>
+          <select id="image-count">
+            <option value="24">24 images (~10s per scene)</option>
+            <option value="32">32 images (~7s per scene)</option>
+            <option value="40" selected>40 images (~6s per scene)</option>
+            <option value="48">48 images (~5s per scene)</option>
+          </select>
+        </div>
+
+        <div class="glass-card">
+          <div class="glass-card-title">Script Input</div>
+          <textarea id="image-script" placeholder="Select a character look above first…" disabled style="opacity:0.4;cursor:not-allowed;resize:none;min-height:130px;"></textarea>
+          <button class="ccp-btn primary" id="plan-images-btn" disabled style="opacity:0.38;cursor:not-allowed;margin-top:16px;">🖼 Plan Visual Beats</button>
+        </div>
+
+        <div class="ccp-output" id="images-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Visual Beats</span>
+            <button class="ccp-btn copy" id="copy-all-beats-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy All</button>
+            <button class="ccp-btn primary" id="render-all-beats-btn" style="margin:0 0 0 6px;padding:5px 12px;font-size:11px;width:auto;">🎨 Render All</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="image-beats-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Veo 3 -->
+      <section class="ccp-panel" id="tab-veo3">
+        <div class="glass-card">
+          <div class="glass-card-title">Motion Prompts</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Generates image-to-video motion prompts for each beat. Render your images first, then come here.</p>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="ccp-btn primary" id="generate-veo3-btn" style="margin:0;flex:1;">🎬 Generate Veo 3 Prompts</button>
+            <button class="ccp-btn copy" id="copy-all-veo3-btn" style="margin:0;width:auto;padding:12px 16px;display:none;">📋 Copy All</button>
+          </div>
+        </div>
+        <div id="veo3-prompts-list"></div>
+      </section>
+
+      <!-- Voice Generator -->
+      <section class="ccp-panel" id="tab-voice">
+        <div class="glass-card">
+          <div class="glass-card-title">Script to Speech</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Paste one section at a time for best quality. Powered by Gemini TTS.</p>
+
+          <label style="margin-top:0;">Script Section</label>
+          <textarea id="tts-input" placeholder="Paste a section of your script here…" style="min-height:130px;"></textarea>
+
+          <label>Narrator Voice</label>
+          <select id="tts-voice">
+            <option value="Charon">Charon — deep, authoritative (best for narration)</option>
+            <option value="Zephyr">Zephyr — clear, composed (best for documentary)</option>
+          </select>
+
+          <button class="ccp-btn primary" id="generate-tts-btn" style="margin-top:20px;">🔊 Generate Audio</button>
+        </div>
+
+        <div id="tts-output">
+          <audio id="tts-player" controls></audio>
+          <button class="ccp-btn save" id="tts-download-btn">⬇ Download Audio</button>
+        </div>
+      </section>
+
+      <!-- Medical Curiosity -->
+      <section class="ccp-panel" id="tab-medical">
+        <div class="glass-card">
+          <div class="glass-card-title">Video Topic</div>
+          <label style="margin-top:0;">Video Title / Topic</label>
+          <input type="text" id="medical-title" placeholder="e.g. What If You Only Ate Honey For 90 Days?" />
+          <button class="ccp-btn secondary" id="find-topic-medical-btn" style="margin-top:16px;width:100%;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#6ee7b7;">🔍 Find Fresh Topic</button>
+          <div id="find-topic-medical-result" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(13,148,136,0.1);border-radius:8px;border-left:3px solid #0d9488;font-size:12px;color:#aaa;"></div>
+          <button class="ccp-btn primary" id="generate-medical-btn" style="margin-top:12px;">🧬 Generate Medical Script</button>
+        </div>
+
+        <div class="ccp-output" id="medical-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Medical Script</span>
+          </div>
+          <div class="ccp-output-body">
+            <div class="ccp-output-text" id="medical-text"></div>
+            <div class="ccp-btn-row">
+              <button class="ccp-btn copy" id="copy-medical-btn">📋 Copy Script</button>
+              <button class="ccp-btn save" id="save-medical-btn">💾 Save to Project</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Medical Image Planner -->
+      <section class="ccp-panel" id="tab-medimg">
+        <div class="glass-card">
+          <div class="glass-card-title">Medical Storyboard Prompts</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Paste your medical script segment. Each sentence becomes an image prompt + video prompt using the Stickman Medical Style.</p>
+          <label style="margin-top:0;">Script Segment</label>
+          <textarea id="medimg-script" placeholder="Paste your medical script here…" style="min-height:160px;"></textarea>
+          <button class="ccp-btn primary" id="generate-medimg-btn" style="margin-top:16px;">🖼 Generate Image Prompts</button>
+        </div>
+
+        <div class="ccp-output" id="medimg-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Image Prompts</span>
+            <button class="ccp-btn copy" id="copy-medimg-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy All</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="medimg-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Map History Script Generator -->
+      <section class="ccp-panel" id="tab-history">
+        <div class="glass-card">
+          <div class="glass-card-title">Video Topic</div>
+          <label style="margin-top:0;">Topic</label>
+          <input type="text" id="history-topic" placeholder="e.g. The Rise and Fall of the Ottoman Empire" />
+          <button class="ccp-btn secondary" id="find-topic-history-btn" style="margin-top:16px;width:100%;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#6ee7b7;">🔍 Find Fresh Topic</button>
+          <div id="find-topic-history-result" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(13,148,136,0.1);border-radius:8px;border-left:3px solid #0d9488;font-size:12px;color:#aaa;"></div>
+          <button class="ccp-btn primary" id="generate-history-btn" style="margin-top:12px;">🗺️ Generate History Script</button>
+        </div>
+
+        <div class="ccp-output" id="history-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">History Script</span>
+          </div>
+          <div class="ccp-output-body">
+            <div class="ccp-output-text" id="history-text"></div>
+            <div class="ccp-btn-row">
+              <button class="ccp-btn copy" id="copy-history-btn">📋 Copy Script</button>
+              <button class="ccp-btn save" id="save-history-btn">💾 Save to Project</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Map History Image Planner -->
+      <section class="ccp-panel" id="tab-histimg">
+        <div class="glass-card">
+          <div class="glass-card-title">Map History Storyboard Prompts</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Paste your completed Map History script. One image prompt is generated per [ANIMATION NOTE], with overlay text, transition, and duration.</p>
+          <label style="margin-top:0;">Completed Script</label>
+          <textarea id="histimg-script" placeholder="Paste your Map History script here…" style="min-height:180px;"></textarea>
+          <label style="margin-top:14px;">Topic (for context)</label>
+          <input type="text" id="histimg-topic" placeholder="e.g. The Rise and Fall of the Ottoman Empire" />
+          <button class="ccp-btn primary" id="generate-histimg-btn" style="margin-top:16px;">🖼 Generate Image Prompts</button>
+        </div>
+
+        <div class="ccp-output" id="histimg-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Image Prompts</span>
+            <button class="ccp-btn copy" id="copy-histimg-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy All</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="histimg-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Geopolitical What-If Script Generator -->
+      <section class="ccp-panel" id="tab-geo">
+        <div class="glass-card">
+          <div class="glass-card-title">Topic</div>
+          <label style="margin-top:0;">Geopolitical Topic / Scenario</label>
+          <input type="text" id="geo-topic" placeholder="e.g. What Happens If China Invades Taiwan?" />
+          <button class="ccp-btn secondary" id="find-topic-geo-btn" style="margin-top:16px;width:100%;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);color:#6ee7b7;">🔍 Find Fresh Topic</button>
+          <div id="find-topic-geo-result" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(13,148,136,0.1);border-radius:8px;border-left:3px solid #0d9488;font-size:12px;color:#aaa;"></div>
+          <button class="ccp-btn primary" id="generate-geo-btn" style="margin-top:12px;">🌐 Generate Geopolitical Script</button>
+        </div>
+
+        <div class="ccp-output" id="geo-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Geopolitical Script</span>
+          </div>
+          <div class="ccp-output-body">
+            <div class="ccp-output-text" id="geo-text"></div>
+            <div class="ccp-btn-row">
+              <button class="ccp-btn copy" id="copy-geo-btn">📋 Copy Script</button>
+              <button class="ccp-btn save" id="save-geo-btn">💾 Save to Project</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Geopolitical Image Planner -->
+      <section class="ccp-panel" id="tab-geoimg">
+        <div class="glass-card">
+          <div class="glass-card-title">Geopolitical Storyboard Prompts</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Paste your completed geopolitical script. One image prompt is generated per [ANIMATION NOTE] using the flat 2D editorial cartoon style.</p>
+          <label style="margin-top:0;">Completed Script</label>
+          <textarea id="geoimg-script" placeholder="Paste your geopolitical script here…" style="min-height:180px;"></textarea>
+          <label style="margin-top:14px;">Topic (for context)</label>
+          <input type="text" id="geoimg-topic" placeholder="e.g. What Happens If China Invades Taiwan?" />
+          <button class="ccp-btn primary" id="generate-geoimg-btn" style="margin-top:16px;">🖼 Generate Image Prompts</button>
+        </div>
+
+        <div class="ccp-output" id="geoimg-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Image Prompts</span>
+            <button class="ccp-btn copy" id="copy-geoimg-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy All</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="geoimg-list"></div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Other Niche — Video Analyzer + Script Generator -->
+      <section class="ccp-panel" id="tab-other">
+
+        <!-- Step 1: URL input -->
+        <div class="analyser-card">
+
+          <!-- Title block -->
+          <div class="analyser-header">
+            <div class="analyser-yt-badge">
+              <svg width="18" height="13" viewBox="0 0 18 13" fill="none"><path d="M17.64 2.03A2.26 2.26 0 0 0 16.06.45C14.65 0 9 0 9 0S3.35 0 1.94.45A2.26 2.26 0 0 0 .36 2.03C0 3.44 0 6.5 0 6.5s0 3.06.36 4.47a2.26 2.26 0 0 0 1.58 1.58C3.35 13 9 13 9 13s5.65 0 7.06-.45a2.26 2.26 0 0 0 1.58-1.58C18 9.56 18 6.5 18 6.5s0-3.06-.36-4.47Z" fill="#FF0000"/><path d="M7.2 9.25L11.88 6.5 7.2 3.75v5.5Z" fill="white"/></svg>
+            </div>
+            <div>
+              <h3 class="analyser-title">Reference Video Analyser</h3>
+              <p class="analyser-subtitle">Drop any YouTube URL — Gemini watches, transcribes &amp; builds your pipeline</p>
+            </div>
+          </div>
+
+          <!-- Capability pills -->
+          <div class="analyser-pills">
+            <span class="analyser-pill">👁 Watches</span>
+            <span class="analyser-pill">📝 Transcribes</span>
+            <span class="analyser-pill">🎨 Visual style</span>
+            <span class="analyser-pill">💡 Topic gaps</span>
+            <span class="analyser-pill">📄 Full script</span>
+          </div>
+
+          <!-- Search bar -->
+          <div class="analyser-search-wrap">
+            <div class="analyser-search-bar">
+              <svg class="analyser-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="url" id="other-url" class="analyser-search-input" placeholder="Paste a YouTube link…" autocomplete="off" spellcheck="false" />
+              <button class="analyser-clear-btn" id="analyser-clear-btn" onclick="const el=document.getElementById('other-url');el.value='';el.focus();" title="Clear">✕</button>
+            </div>
+            <button class="analyser-analyse-btn" id="analyze-video-btn">
+              <span>Analyse &amp; Find Topics</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+
+          <p class="analyser-footnote">Public YouTube videos only &nbsp;·&nbsp; Processed directly by Gemini &nbsp;·&nbsp; No third-party tools</p>
+
+        </div>
+
+        <!-- Step 2: Analysis + topic suggestions (hidden until analysed) -->
+        <div class="ccp-output" id="other-analysis-output" style="display:none;margin-top:16px;">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Video Breakdown</span>
+          </div>
+          <div class="ccp-output-body" style="padding:14px;">
+            <div id="other-analysis-result"></div>
+            <div id="other-topics-section" style="display:none;margin-top:28px;">
+              <div style="margin-bottom:18px;">
+                <div style="font-size:17px;font-weight:700;color:#f1f5f9;margin-bottom:4px;">Choose your next video topic</div>
+                <div style="font-size:13px;color:#6b7280;line-height:1.5;">Each idea is written in the same title style as the reference video. Click any card to generate a full script.</div>
+              </div>
+              <div id="other-topic-cards"></div>
+              <div id="more-topics-status" style="display:none;font-size:12px;color:#6b7280;padding:8px 0;"></div>
+              <button id="more-topics-btn" class="ccp-btn-secondary" style="margin-top:14px;width:100%;">+ Generate More Topic Ideas</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Script generation (hidden until topic selected) -->
+        <div id="other-script-section" style="display:none;margin-top:16px;">
+          <div class="glass-card">
+            <div class="glass-card-title">Script Generator</div>
+            <div id="other-selected-topic-display" style="padding:10px 14px;background:rgba(124,58,237,0.1);border:1px solid rgba(192,132,252,0.2);border-radius:8px;font-size:13px;color:#c084fc;margin-bottom:14px;line-height:1.5;"></div>
+            <button class="ccp-btn secondary" id="generate-other-btn" style="font-size:12px;opacity:0.7;">↻ Regenerate Script</button>
+          </div>
+          <div class="ccp-output" id="other-script-output" style="display:none;margin-top:0;">
+            <div class="ccp-output-header">
+              <span class="ccp-output-label" id="other-script-label">Generated Script</span>
+            </div>
+            <div class="ccp-output-body">
+              <div class="ccp-output-text" id="other-text"></div>
+              <div class="ccp-btn-row">
+                <button class="ccp-btn copy" id="copy-other-btn">📋 Copy Script</button>
+                <button class="ccp-btn save" id="save-other-btn">💾 Save to Project</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Other Niche — Image Planner -->
+      <section class="ccp-panel" id="tab-otherimg">
+        <div class="glass-card">
+          <div class="glass-card-title">Other Niche Image Planner</div>
+          <p class="panel-desc" style="margin-bottom:16px;">Generates frame-by-frame image prompts matched to the visual style of your reference video.</p>
+          <div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,0.07);">
+            <div style="font-size:11px;font-weight:700;color:#c084fc;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Style</div>
+            <label style="margin-top:0;">Style Reference</label>
+            <p style="font-size:11px;color:var(--text2);margin:2px 0 8px;line-height:1.5;">Upload an image <em>or</em> paste a YouTube URL. Gemini scans it and locks every image prompt to that exact visual style.</p>
+
+            <label for="style-reference-file-other" id="style-reference-file-label-other" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;border:1px dashed rgba(124,58,237,0.4);border-radius:8px;font-size:12px;color:#a78bfa;background:rgba(124,58,237,0.04);margin:0 0 8px;">
+              <span style="font-size:18px;line-height:1;">🖼</span>
+              <span id="style-file-name-other" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Click to upload a reference image…</span>
+              <span style="font-size:10px;color:#6b7280;flex-shrink:0;">PNG · JPG · WEBP</span>
+            </label>
+            <input type="file" id="style-reference-file-other" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;" />
+
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <div style="flex:1;height:1px;background:rgba(255,255,255,0.07);"></div>
+              <span style="font-size:10px;color:#4b5563;">or paste a URL</span>
+              <div style="flex:1;height:1px;background:rgba(255,255,255,0.07);"></div>
+            </div>
+
+            <div style="display:flex;gap:8px;">
+              <input type="url" id="style-reference-url-other" placeholder="YouTube URL or image URL…" style="flex:1;margin:0;" />
+              <button class="ccp-btn ghost" id="extract-style-ref-other-btn" style="margin:0;width:auto;padding:0 14px;white-space:nowrap;flex-shrink:0;">🔍 Extract Style</button>
+            </div>
+            <div id="style-ref-preview-other" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.25);border-radius:8px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:10px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:.07em;">🔒 Style Locked</span>
+                <button id="clear-style-ref-other-btn" style="font-size:11px;color:#6b7280;background:none;border:none;cursor:pointer;padding:0;">✕ Clear</button>
+              </div>
+              <div id="style-ref-text-other" style="font-size:11px;color:#c4b5fd;line-height:1.6;white-space:pre-wrap;"></div>
+            </div>
+          </div>
+
+          <label style="margin-top:0;">Completed Script</label>
+          <textarea id="otherimg-script" placeholder="Your refined script will auto-fill here…" style="min-height:180px;"></textarea>
+          <label style="margin-top:14px;">Topic</label>
+          <input type="text" id="otherimg-topic" placeholder="Your selected topic…" />
+          <button class="ccp-btn primary" id="generate-otherimg-btn" style="margin-top:16px;">🖼 Generate Image Prompts</button>
+        </div>
+        <div class="ccp-output" id="otherimg-output">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Image Prompts</span>
+            <button class="ccp-btn copy" id="copy-otherimg-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy All</button>
+            <button class="ccp-btn primary" id="render-all-otherimg-btn" style="margin:0 0 0 6px;padding:5px 12px;font-size:11px;width:auto;">🎨 Render All</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="otherimg-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Video Assembly -->
+      <section class="ccp-panel" id="tab-assembly">
+        <div class="glass-card">
+          <div class="glass-card-title">Video Assembly</div>
+          <p class="panel-desc" style="margin-bottom:16px;">The final step. Your script and scene list are pulled in automatically — just confirm everything looks right and generate your edit timeline.</p>
+
+          <!-- Status badges — populated by JS -->
+          <div id="assembly-status-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+          <!-- No-beats warning -->
+          <div id="assembly-no-beats-msg" style="display:none;margin-bottom:16px;padding:12px 16px;background:rgba(251,191,36,0.07);border-left:3px solid #f59e0b;border-radius:8px;font-size:12px;color:#fcd34d;line-height:1.6;">
+            No scenes found yet. Go to <strong>Image Planner</strong> first and generate your visual beats — then come back here.
+          </div>
+
+          <!-- Script — auto-filled from niche tab -->
+          <label style="margin-top:0;">Script <span style="color:#6b7280;font-weight:400;font-size:11px;">— auto-filled from your script generator</span></label>
+          <textarea id="assembly-script" placeholder="Your script will appear here automatically once you've generated it…" style="min-height:160px;"></textarea>
+
+          <!-- Clip beats — simple text field -->
+          <div id="assembly-clip-field" style="margin-top:16px;">
+            <label style="margin-top:0;">Video clips (optional) <span style="color:#6b7280;font-weight:400;font-size:11px;">— if you have Veo 3 clips for some scenes</span></label>
+            <input type="text" id="assembly-clip-beats" placeholder="Enter scene numbers that have video clips, e.g.  3, 7, 12  — leave blank if all scenes are still images" style="font-size:13px;" />
+          </div>
+
+          <button class="ccp-btn primary" id="generate-assembly-btn" style="margin-top:20px;">🎞 Generate Edit Timeline</button>
+        </div>
+
+        <div class="ccp-output" id="assembly-output" style="display:none;">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Edit Timeline</span>
+            <button class="ccp-btn copy" id="copy-assembly-btn" style="margin:0;padding:5px 12px;font-size:11px;width:auto;">📋 Copy</button>
+          </div>
+          <div class="ccp-output-body" style="padding:10px;">
+            <div id="assembly-result"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Video Compiler -->
+      <section class="ccp-panel" id="tab-compiler">
+
+        <div class="glass-card">
+          <div class="glass-card-title">Video Package Compiler</div>
+          <p class="panel-desc" style="margin-bottom:20px;">Paste a reference URL and your finished script. The compiler extracts the animation style, segments your script into timed beats, renders every scene image, generates narration, then packages everything with an FFmpeg assembly command.</p>
+
+          <label style="margin-top:0;">Video Title</label>
+          <input type="text" id="compiler-title" placeholder="e.g. The Fall of Constantinople" />
+
+          <label style="margin-top:14px;">Reference Video URL</label>
+          <input type="url" id="compiler-url" placeholder="https://www.youtube.com/watch?v=…" />
+
+          <label style="margin-top:14px;">Finished Script</label>
+          <textarea id="compiler-script" placeholder="Paste your completed script here… (must contain [VOICEOVER] and [ANIMATION NOTE] markers)" style="min-height:200px;"></textarea>
+
+          <div class="form-grid-2" style="margin-top:14px;">
+            <div>
+              <label style="margin-top:0;">Narrator Voice</label>
+              <select id="compiler-voice">
+                <option value="Charon">Charon — deep, authoritative</option>
+                <option value="Zephyr">Zephyr — clear, composed</option>
+              </select>
+            </div>
+            <div>
+              <label style="margin-top:0;">Narration speed</label>
+              <select id="compiler-wps">
+                <option value="2.0">2.0 wps — slow / dramatic</option>
+                <option value="2.5" selected>2.5 wps — standard</option>
+                <option value="3.0">3.0 wps — fast</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="ccp-btn primary" id="run-compiler-btn" style="margin-top:20px;width:100%;">▶ Run Full Compiler</button>
+        </div>
+
+        <!-- Progress -->
+        <div id="compiler-progress" class="glass-card" style="display:none;margin-top:16px;">
+          <div class="glass-card-title">Compilation Progress</div>
+          <div class="compiler-steps">
+            <div class="compiler-step" id="cstep-style">
+              <div class="cstep-dot pending"></div>
+              <div class="cstep-body"><div class="cstep-label">Style Extraction</div><div class="cstep-sub" id="cstep-style-sub">Waiting…</div></div>
+            </div>
+            <div class="compiler-step" id="cstep-segment">
+              <div class="cstep-dot pending"></div>
+              <div class="cstep-body"><div class="cstep-label">Script Segmentation</div><div class="cstep-sub" id="cstep-segment-sub">Waiting…</div></div>
+            </div>
+            <div class="compiler-step" id="cstep-images">
+              <div class="cstep-dot pending"></div>
+              <div class="cstep-body"><div class="cstep-label">Image Generation</div><div class="cstep-sub" id="cstep-images-sub">Waiting…</div></div>
+            </div>
+            <div class="compiler-step" id="cstep-tts">
+              <div class="cstep-dot pending"></div>
+              <div class="cstep-body"><div class="cstep-label">TTS Narration</div><div class="cstep-sub" id="cstep-tts-sub">Waiting…</div></div>
+            </div>
+            <div class="compiler-step" id="cstep-package">
+              <div class="cstep-dot pending"></div>
+              <div class="cstep-body"><div class="cstep-label">Building Package</div><div class="cstep-sub" id="cstep-package-sub">Waiting…</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div id="compiler-results" style="display:none;margin-top:16px;">
+
+          <div class="glass-card">
+            <div class="glass-card-title">Animation Style Guide</div>
+            <div id="compiler-style-output" style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap;margin-top:4px;"></div>
+          </div>
+
+          <div class="glass-card" style="margin-top:16px;">
+            <div class="glass-card-title">Timed Segments</div>
+            <div id="compiler-segments-list"></div>
+          </div>
+
+          <div class="glass-card" style="margin-top:16px;">
+            <div class="glass-card-title">Narration</div>
+            <audio id="compiler-audio" controls style="width:100%;margin-top:10px;border-radius:6px;"></audio>
+          </div>
+
+          <div class="glass-card" style="margin-top:16px;">
+            <div class="glass-card-title">Export Package</div>
+            <p class="panel-desc">ZIP contains all rendered images named <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">scene_01_5.5s.png</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">narration.wav</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">timeline.json</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">filelist.txt</code>, and <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">ffmpeg_stitch.txt</code>. Run the single FFmpeg command and your video is done.</p>
+            <button class="ccp-btn primary" id="compiler-download-btn" style="margin-top:14px;width:100%;">⬇ Download Package ZIP</button>
+            <div style="margin-top:16px;">
+              <label style="margin-top:0;">FFmpeg Assembly Command</label>
+              <textarea id="compiler-ffmpeg-cmd" style="min-height:80px;font-family:monospace;font-size:11px;color:#a78bfa;" readonly></textarea>
+              <button class="ccp-btn copy" id="compiler-copy-ffmpeg-btn" style="margin-top:8px;width:auto;">📋 Copy Command</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Projects -->
+      <section class="ccp-panel" id="tab-projects">
+        <button class="ccp-btn primary" id="new-project-toggle-btn" style="margin-bottom:16px;">+ New Project</button>
+
+        <div id="new-project-form">
+          <div class="glass-card-title">New Project</div>
+          <label style="margin-top:0;">Title</label>
+          <input type="text" id="project-title" placeholder="e.g. 'Rich Mindset Series EP1'" />
+          <label>Notes (optional)</label>
+          <textarea id="project-notes" placeholder="Script, thumbnail ideas, links…"></textarea>
+          <div class="ccp-btn-row">
+            <button class="ccp-btn save" id="save-project-btn">💾 Save Project</button>
+            <button class="ccp-btn ghost" id="cancel-project-btn">Cancel</button>
+          </div>
+        </div>
+
+        <div id="projects-list"></div>
+      </section>
+
+      <!-- Settings -->
+      <section class="ccp-panel" id="tab-settings">
+        <div class="settings-block">
+          <div class="settings-block-title">Google AI Studio API Key</div>
+          <label style="margin-top:0;">API Key</label>
+          <input type="password" id="gemini-key-input" placeholder="AIza…" />
+          <p class="ccp-hint">Powers all features — script generation, images, and voice. Get yours free at aistudio.google.com</p>
+          <button class="ccp-btn primary" id="save-gemini-key-btn" style="margin-top:14px;">Save Key</button>
+          <div id="gemini-key-status"></div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Generation Model</div>
+          <label style="margin-top:0;">Model</label>
+          <select id="model-select">
+            <option value="gemini-2.5-pro" selected>Gemini 2.5 Pro — Best quality (default)</option>
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash — Faster</option>
+          </select>
+          <button class="ccp-btn save" id="save-model-btn" style="margin-top:14px;">Save Model</button>
+          <div id="model-status"></div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Supadata API Key</div>
+          <label style="margin-top:0;">API Key</label>
+          <input type="password" id="supadata-key-input" placeholder="supa-…" />
+          <p class="ccp-hint">Used to fetch real YouTube transcripts for the Video Analyser. Get yours at dash.supadata.ai</p>
+          <button class="ccp-btn primary" id="save-supadata-key-btn" style="margin-top:14px;">Save Key</button>
+          <div id="supadata-key-status"></div>
+        </div>
+
+        <p class="ccp-hint" style="text-align:center;margin-top:12px;">All data stored locally in your browser.</p>
+      </section>
+
+    </div>
+  </div>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
