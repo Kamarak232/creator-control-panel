@@ -1672,8 +1672,7 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
         reader.onerror = rej;
         reader.readAsDataURL(blob);
       });
-      const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-      const apiResp = await _geminiFetch(model, {
+      const apiResp = await _geminiFetch('gemini-2.0-flash', {
           system_instruction: { parts: [{ text: SYS }] },
           contents: [{ parts: [
             { inlineData: { mimeType, data: base64 } },
@@ -1686,8 +1685,9 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
         result = { error: err?.error?.message || `HTTP ${apiResp.status}` };
       } else {
         const data = await apiResp.json();
-        const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-        result = text ? { text } : { error: 'No response from Gemini.' };
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const text = parts.filter(p => !p.thought).map(p => p.text || '').join('').trim();
+        result = text ? { text } : { error: `No text in response. Raw: ${JSON.stringify(data).slice(0, 300)}` };
       }
     } catch (e) {
       result = { error: e.message };
@@ -1749,8 +1749,7 @@ Cover ALL of the following — do not skip any, even if the answer seems trivial
 Output a single dense paragraph (6–10 sentences) combining all of the above into a reusable style prompt. Be ruthlessly specific. Never use vague words like "cinematic", "beautiful", or "stylistic" without qualification. Output the paragraph only — no headers, no bullet points, no labels.`;
 
   const _geminiImageCall = async (base64, mimeType) => {
-    const model   = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-    const apiResp = await _geminiFetch(model, {
+    const apiResp = await _geminiFetch('gemini-2.0-flash', {
         system_instruction: { parts: [{ text: SYS }] },
         contents: [{ parts: [
           { inlineData: { mimeType, data: base64 } },
@@ -1763,8 +1762,10 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
       return { error: err?.error?.message || `HTTP ${apiResp.status}` };
     }
     const data = await apiResp.json();
-    const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-    return text ? { text } : { error: 'No response from Gemini.' };
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const text = parts.filter(p => !p.thought).map(p => p.text || '').join('').trim();
+    if (!text) return { error: `No text in response. Raw: ${JSON.stringify(data).slice(0, 300)}` };
+    return { text };
   };
 
   let result;
