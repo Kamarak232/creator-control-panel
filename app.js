@@ -11,21 +11,34 @@ function hasApiAccess() {
   return h !== 'localhost' && h !== '127.0.0.1' && window.location.protocol !== 'file:';
 }
 
-// Single entry point for all Gemini fetch calls — always routes through proxy
+// Cache the server-side key in memory so we only fetch it once per session
+let _serverKey = null;
+async function _getApiKey() {
+  const local = localStorage.getItem('geminiKey');
+  if (local) return local;
+  if (_serverKey) return _serverKey;
+  try {
+    const res = await fetch('/api/key');
+    const data = await res.json();
+    if (data.key) { _serverKey = data.key; return _serverKey; }
+  } catch (e) {}
+  return '';
+}
+
+// Single entry point for all Gemini fetch calls — calls Gemini directly with key
 async function _geminiFetch(model, payload) {
-  const key = localStorage.getItem('geminiKey') || '';
-  return fetch('/api/gemini', {
+  const key = await _getApiKey();
+  return fetch(`${GEMINI_BASE}/${model}:generateContent?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, model, payload })
+    body: JSON.stringify(payload)
   });
 }
 
-// Builds the correct Gemini API URL — used for legacy direct-fetch paths
 function buildApiUrl(model) {
   const key = localStorage.getItem('geminiKey');
   if (key) return `${GEMINI_BASE}/${model}:generateContent?key=${key}`;
-  return `/api/gemini/${model}:generateContent`;
+  return `${GEMINI_BASE}/${model}:generateContent?key=pending`;
 }
 
 // ─── In-memory character reference state ───────────────────────────────────

@@ -1,17 +1,12 @@
 [build]
   functions = "netlify/functions"
-  edge_functions = "netlify/edge-functions"
 
 [[redirects]]
-  from = "/api/gemini"
-  to = "/.netlify/functions/gemini"
+  from = "/api/key"
+  to = "/.netlify/functions/key"
   status = 200
-  force = true
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[functions]
-  timeout = 26
