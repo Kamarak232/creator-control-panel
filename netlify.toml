@@ -6,6 +6,7 @@
   from = "/api/gemini"
   to = "/.netlify/functions/gemini"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
