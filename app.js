@@ -1672,7 +1672,7 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
         reader.onerror = rej;
         reader.readAsDataURL(blob);
       });
-      const apiResp = await _geminiFetch('gemini-1.5-flash', {
+      const apiResp = await _geminiFetch('gemini-2.5-flash', {
           system_instruction: { parts: [{ text: SYS }] },
           contents: [{ parts: [
             { inlineData: { mimeType, data: base64 } },
@@ -1749,7 +1749,7 @@ Cover ALL of the following — do not skip any, even if the answer seems trivial
 Output a single dense paragraph (6–10 sentences) combining all of the above into a reusable style prompt. Be ruthlessly specific. Never use vague words like "cinematic", "beautiful", or "stylistic" without qualification. Output the paragraph only — no headers, no bullet points, no labels.`;
 
   const _geminiImageCall = async (base64, mimeType) => {
-    const apiResp = await _geminiFetch('gemini-1.5-flash', {
+    const apiResp = await _geminiFetch('gemini-2.5-flash', {
         system_instruction: { parts: [{ text: SYS }] },
         contents: [{ parts: [
           { inlineData: { mimeType, data: base64 } },
@@ -2662,7 +2662,7 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
   if (shortenMatch) videoUrl = `https://www.youtube.com/watch?v=${shortenMatch[1]}`;
 
   // Models with confirmed YouTube URL fileData support, tried in order
-  const VIDEO_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash'];
+  const VIDEO_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash'];
 
   for (let mi = 0; mi < VIDEO_MODELS.length; mi++) {
     const videoModel = VIDEO_MODELS[mi];
@@ -3709,9 +3709,9 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
 
   const MODELS = [
     'gemini-2.5-flash',
-    'gemini-1.5-flash',
+    'gemini-2.5-flash',
     'gemini-2.5-flash-preview-04-17',
-    'gemini-1.5-flash',
+    'gemini-2.5-flash',
   ];
 
   const makeBody = (withSearch) => ({
