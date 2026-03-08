@@ -11,7 +11,22 @@ function hasApiAccess() {
   return h !== 'localhost' && h !== '127.0.0.1' && window.location.protocol !== 'file:';
 }
 
-// Builds the correct Gemini API URL — uses serverless proxy when no personal key is set
+// Single entry point for all Gemini fetch calls — routes through proxy on deployed site
+async function _geminiFetch(model, payload) {
+  const key = localStorage.getItem('geminiKey') || '';
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+  if (isLocal && key) {
+    return fetch(`${GEMINI_BASE}/${model}:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+  }
+  return fetch('/api/gemini', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, model, payload })
+  });
+}
+
+// Builds the correct Gemini API URL — used for legacy direct-fetch paths
 function buildApiUrl(model) {
   const key = localStorage.getItem('geminiKey');
   if (key) return `${GEMINI_BASE}/${model}:generateContent?key=${key}`;
@@ -51,7 +66,6 @@ async function callGemini(systemPrompt, userPrompt) {
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
   const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-  const url = buildApiUrl(model);
 
   let fullText = '';
   // Build up conversation turns for continuation calls
@@ -65,15 +79,11 @@ async function callGemini(systemPrompt, userPrompt) {
       if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
 
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const response = await _geminiFetch(model, {
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents,
             generationConfig: { maxOutputTokens: 65536, temperature: 1.0 }
-          })
-        });
+          });
 
         if (response.status === 503 || response.status === 429) {
           if (attempt === 0) continue;
@@ -134,8 +144,6 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
   const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
-  const url = buildApiUrl('gemini-2.5-flash-image');
-
   const parts = [];
   if (referenceImages?.length) {
     for (const ref of referenceImages) {
@@ -145,14 +153,10 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
   parts.push({ text: prompt });
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const response = await _geminiFetch('gemini-2.5-flash-image', {
         contents: [{ parts }],
         generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-      })
-    });
+      });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -197,13 +201,8 @@ async function geminiTTS({ text, voice }) {
   const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
-  const url = buildApiUrl('gemini-2.5-flash-preview-tts');
-
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const response = await _geminiFetch('gemini-2.5-flash-preview-tts', {
         contents: [{ parts: [{ text }] }],
         generationConfig: {
           responseModalities: ['AUDIO'],
@@ -211,8 +210,7 @@ async function geminiTTS({ text, voice }) {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
           }
         }
-      })
-    });
+      });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -2670,12 +2668,12 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
   const VIDEO_MODELS = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (let mi = 0; mi < VIDEO_MODELS.length; mi++) {
-    const apiUrl  = buildApiUrl(VIDEO_MODELS[mi]);
+    const videoModel = VIDEO_MODELS[mi];
     let fullText  = '';
     const contents = [{
       role: 'user',
       parts: [
-        { fileData: { fileUri: videoUrl } },   // no mimeType — YouTube URLs are natively understood
+        { fileData: { fileUri: videoUrl } },
         { text: userPrompt }
       ]
     }];
@@ -2686,15 +2684,11 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
       for (let attempt = 0; attempt < 2; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
         try {
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          const response = await _geminiFetch(videoModel, {
               system_instruction: { parts: [{ text: systemPrompt }] },
               contents,
               generationConfig: { maxOutputTokens: 65536, temperature: 1.0 }
-            })
-          });
+            });
           if (response.status === 503 || response.status === 429) { if (attempt === 0) continue; break; }
           if (!response.ok) {
             const err = await response.json().catch(() => ({}));
@@ -3692,13 +3686,9 @@ function _renderOtherImagePrompts(text) {
 // ─── Title Ideas ──────────────────────────────────────────────────────────
 
 // Single Gemini request — returns { text } or null
-async function _geminiRequest(url, body) {
+async function _geminiRequest(model, body) {
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const response = await _geminiFetch(model, body);
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
@@ -3741,25 +3731,23 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
 
   // Pass 1: with Google Search grounding
   for (const model of MODELS) {
-    const url = buildApiUrl(model);
     for (let i = 0; i < 3; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 4000));
-      const res = await _geminiRequest(url, makeBody(true));
-      if (!res) continue;                              // null = empty/network error, retry
+      const res = await _geminiRequest(model, makeBody(true));
+      if (!res) continue;
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
-      if (res.text) return { text: res.text };         // success
-      if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break; // next model
+      if (res.text) return { text: res.text };
+      if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break;
       if (res.status === 429 || res.status === 503) continue;
-      break; // other error — try next model
+      break;
     }
   }
 
-  // Pass 2: fallback without search grounding (works on all keys)
+  // Pass 2: fallback without search grounding
   for (const model of MODELS) {
-    const url = buildApiUrl(model);
     for (let i = 0; i < 2; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 3000));
-      const res = await _geminiRequest(url, makeBody(false));
+      const res = await _geminiRequest(model, makeBody(false));
       if (!res) continue;
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };

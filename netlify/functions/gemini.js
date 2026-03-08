@@ -1,30 +1,36 @@
-// Netlify serverless proxy — keeps GEMINI_API_KEY server-side
-// All Gemini API calls from the frontend hit /api/gemini/* which redirects here
 exports.handler = async (event) => {
-  const KEY = process.env.GEMINI_API_KEY;
-  if (!KEY) {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: { message: 'Method not allowed' } }) };
+  }
+
+  let body;
+  try { body = JSON.parse(event.body); } catch (e) {
+    return { statusCode: 400, body: JSON.stringify({ error: { message: 'Invalid JSON body' } }) };
+  }
+
+  const { key, model, payload } = body;
+
+  // Use client-supplied key if present, otherwise fall back to server env var
+  const apiKey = key || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: { message: 'Server API key not configured. Set GEMINI_API_KEY in Netlify environment variables.' } })
+      body: JSON.stringify({ error: { message: 'No API key available. Set GEMINI_API_KEY in Netlify environment variables.' } })
     };
   }
 
-  // Extract the model path from the URL
-  // e.g. /api/gemini/gemini-2.5-flash-preview-05-20:generateContent
-  const pathParts = event.path.split('/api/gemini/');
-  const modelPath = pathParts.length > 1 ? pathParts[1] : '';
-  if (!modelPath) {
-    return { statusCode: 400, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: { message: 'Missing model path.' } }) };
+  if (!model || !payload) {
+    return { statusCode: 400, body: JSON.stringify({ error: { message: 'Missing model or payload' } }) };
   }
 
-  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelPath}?key=${KEY}`;
+  const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
     const resp = await fetch(targetUrl, {
-      method: event.httpMethod,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: event.body,
+      body: JSON.stringify(payload),
     });
     const text = await resp.text();
     return {
