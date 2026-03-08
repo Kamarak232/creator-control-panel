@@ -1686,7 +1686,7 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
         result = { error: err?.error?.message || `HTTP ${apiResp.status}` };
       } else {
         const data = await apiResp.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
         result = text ? { text } : { error: 'No response from Gemini.' };
       }
     } catch (e) {
@@ -1763,7 +1763,7 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
       return { error: err?.error?.message || `HTTP ${apiResp.status}` };
     }
     const data = await apiResp.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
     return text ? { text } : { error: 'No response from Gemini.' };
   };
 
