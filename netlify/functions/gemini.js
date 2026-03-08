@@ -10,7 +10,6 @@ exports.handler = async (event) => {
 
   const { key, model, payload } = body;
 
-  // Use client-supplied key if present, otherwise fall back to server env var
   const apiKey = key || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return {
@@ -27,20 +26,29 @@ exports.handler = async (event) => {
   const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
-    const resp = await fetch(targetUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const text = await resp.text();
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini request timed out after 25 seconds')), 25000)
+    );
+
+    const geminiRes = await Promise.race([
+      fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      timeout
+    ]);
+
+    const text = await geminiRes.text();
     return {
-      statusCode: resp.status,
+      statusCode: geminiRes.status,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       body: text,
     };
   } catch (err) {
+    const isTimeout = err.message.includes('timed out');
     return {
-      statusCode: 500,
+      statusCode: isTimeout ? 504 : 500,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: { message: err.message } })
     };
