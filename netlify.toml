@@ -3,6 +3,12 @@
   edge_functions = "netlify/edge-functions"
 
 [[redirects]]
+  from = "/api/gemini/*"
+  to = "/api/gemini/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
