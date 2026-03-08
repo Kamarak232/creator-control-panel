@@ -1672,21 +1672,15 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
         reader.onerror = rej;
         reader.readAsDataURL(blob);
       });
-      const geminiKey = getGeminiKey();
       const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-      const apiUrl = buildApiUrl(model);
-      const apiResp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const apiResp = await _geminiFetch(model, {
           system_instruction: { parts: [{ text: SYS }] },
           contents: [{ parts: [
             { inlineData: { mimeType, data: base64 } },
             { text: USER }
           ]}],
           generationConfig: { maxOutputTokens: 1024, temperature: 0.3 }
-        })
-      });
+        });
       if (!apiResp.ok) {
         const err = await apiResp.json().catch(() => ({}));
         result = { error: err?.error?.message || `HTTP ${apiResp.status}` };
@@ -1755,21 +1749,15 @@ Cover ALL of the following — do not skip any, even if the answer seems trivial
 Output a single dense paragraph (6–10 sentences) combining all of the above into a reusable style prompt. Be ruthlessly specific. Never use vague words like "cinematic", "beautiful", or "stylistic" without qualification. Output the paragraph only — no headers, no bullet points, no labels.`;
 
   const _geminiImageCall = async (base64, mimeType) => {
-    const geminiKey = getGeminiKey();
-    const model     = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-    const apiUrl    = buildApiUrl(model);
-    const apiResp   = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const model   = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
+    const apiResp = await _geminiFetch(model, {
         system_instruction: { parts: [{ text: SYS }] },
         contents: [{ parts: [
           { inlineData: { mimeType, data: base64 } },
           { text: USER }
         ]}],
         generationConfig: { maxOutputTokens: 1024, temperature: 0.3 }
-      })
-    });
+      });
     if (!apiResp.ok) {
       const err = await apiResp.json().catch(() => ({}));
       return { error: err?.error?.message || `HTTP ${apiResp.status}` };
@@ -3556,22 +3544,16 @@ Output all 70 prompts in order. End with: TOTAL PROMPTS: [n]`;
     let result;
     if (_styleRefImgData) {
       // Send the actual image to Gemini so it can SEE the style while writing prompts
-      const geminiKey = getGeminiKey();
-      const model     = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-      const apiUrl    = buildApiUrl(model);
+      const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
       try {
-        const apiResp = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const apiResp = await _geminiFetch(model, {
             system_instruction: { parts: [{ text: SYS_REF }] },
             contents: [{ parts: [
               { inlineData: { mimeType: _styleRefImgMime, data: _styleRefImgData } },
               { text: PROMPT_REF }
             ]}],
             generationConfig: { maxOutputTokens: 32768, temperature: 0.4 }
-          })
-        });
+          });
         if (!apiResp.ok) {
           const err = await apiResp.json().catch(() => ({}));
           result = { error: err?.error?.message || `HTTP ${apiResp.status}` };
@@ -4276,22 +4258,16 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
   if (_styleRefImgData) {
     // Use uploaded style reference image instead of video URL
     _cstepSet('style', 'running', 'Scanning style image…');
-    const geminiKey = getGeminiKey();
-    const model     = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-    const apiUrl    = buildApiUrl(model);
+    const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
     try {
-      const apiResp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const apiResp = await _geminiFetch(model, {
           system_instruction: { parts: [{ text: _styleExtractSYS }] },
           contents: [{ parts: [
             { inlineData: { mimeType: _styleRefImgMime, data: _styleRefImgData } },
             { text: _styleExtractUSER }
           ]}],
           generationConfig: { maxOutputTokens: 2048, temperature: 0.3 }
-        })
-      });
+        });
       if (!apiResp.ok) {
         const err = await apiResp.json().catch(() => ({}));
         styleResult = { error: err?.error?.message || `HTTP ${apiResp.status}` };
@@ -4542,11 +4518,7 @@ function _compilerUpdateSegmentImage(seg) {
 }
 
 async function _compilerVerifyImage(imageData, mimeType, styleGuide, sceneDesc) {
-  const geminiKey = getGeminiKey();
-  if (!geminiKey) return { pass: true }; // skip verification if no key (shouldn't happen)
-
   const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-  const url   = buildApiUrl(model);
 
   const prompt = `You are a creative director QA-checking AI-generated images for a YouTube video.
 
@@ -4568,17 +4540,13 @@ DEVIATIONS: [list any deviations, or "None"]
 CORRECTED PROMPT: [If PASS is NO — write a new, highly specific image generation prompt that fixes all deviations while keeping the same scene. If PASS is YES — write "N/A"]`;
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const response = await _geminiFetch(model, {
         contents: [{ parts: [
           { inlineData: { mimeType, data: imageData } },
           { text: prompt }
         ]}],
         generationConfig: { maxOutputTokens: 1024, temperature: 0.2 }
-      })
-    });
+      });
     if (!response.ok) return { pass: true }; // on API error, skip and move on
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
