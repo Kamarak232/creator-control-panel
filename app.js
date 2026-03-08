@@ -11,17 +11,12 @@ function hasApiAccess() {
   return h !== 'localhost' && h !== '127.0.0.1' && window.location.protocol !== 'file:';
 }
 
-// Single entry point for all Gemini fetch calls — routes through proxy on deployed site
+// Single entry point for all Gemini fetch calls — always routes through proxy
 async function _geminiFetch(model, payload) {
   const key = localStorage.getItem('geminiKey') || '';
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-  if (isLocal && key) {
-    return fetch(`${GEMINI_BASE}/${model}:generateContent?key=${key}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-    });
-  }
   return fetch('/api/gemini', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, model, payload })
   });
 }
