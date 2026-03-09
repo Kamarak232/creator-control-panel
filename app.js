@@ -4431,92 +4431,122 @@ async function runVideoCompiler() {
   _cstepSet('images', 'done', `${successCount}/${existingImages.length} clips generated`);
   _cstepSet('video', 'done', successCount < existingImages.length ? `${existingImages.length - successCount} fell back to still image` : 'All clips ready');
 
-  // ── Step 5: Encode MP4 in-browser with FFmpeg.wasm ───────────────────
-  _cstepSet('package', 'running', 'Loading video encoder…');
+  // ── Step 5: Stitch with MediaRecorder (no FFmpeg.wasm) ───────────────
+  _cstepSet('package', 'running', 'Setting up recorder…');
   get('compiler-results').style.display = 'block';
   get('compiler-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const videoTitle = get('compiler-title').value.trim() || 'video';
-  const ffmpegCmd  = `ffmpeg -f concat -safe 0 -i filelist.txt -i narration.wav -c:v copy -c:a aac -shortest -y output.mp4`;
-  get('compiler-ffmpeg-cmd').value = ffmpegCmd;
-  get('compiler-copy-ffmpeg-btn').onclick = () => { copyText(ffmpegCmd); showToast('FFmpeg command copied!'); };
 
-  const FFmpegLib = window.FFmpeg;
-  if (!FFmpegLib?.createFFmpeg) {
-    _cstepSet('package', 'error', 'FFmpeg.wasm did not load — check your connection and reload');
+  if (!window.MediaRecorder) {
+    _cstepSet('package', 'error', 'MediaRecorder not supported — use Chrome or Firefox');
     btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
-    return showToast('Video encoder failed to load. Reload the page and try again.', 'error');
+    return showToast('MediaRecorder not supported. Use Chrome or Firefox.', 'error');
   }
 
-  const ffmpeg = FFmpegLib.createFFmpeg({
-    log: false,
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
-  });
+  // Offscreen canvas — all images drawn here at 1280×720
+  const canvas = document.createElement('canvas');
+  canvas.width = 1280; canvas.height = 720;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 1280, 720);
 
+  // Decode narration WAV into Web Audio, route to MediaStream
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  let audioBuffer;
   try {
-    _cstepSet('package', 'running', 'Loading encoder (first load ~30s, then cached)…');
-    await ffmpeg.load();
+    audioBuffer = await audioCtx.decodeAudioData(await _compilerWavBlob.arrayBuffer());
   } catch (e) {
-    _cstepSet('package', 'error', `Encoder load failed: ${e.message}`);
+    _cstepSet('package', 'error', `Audio decode failed: ${e.message}`);
     btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
-    return showToast(`Encoder failed to load: ${e.message}`, 'error');
+    return showToast(`Audio failed: ${e.message}`, 'error');
   }
+  const audioDest = audioCtx.createMediaStreamDestination();
+  const audioSrc  = audioCtx.createBufferSource();
+  audioSrc.buffer = audioBuffer;
+  audioSrc.connect(audioDest);
 
-  // Write narration
-  ffmpeg.FS('writeFile', 'narration.wav', new Uint8Array(await _compilerWavBlob.arrayBuffer()));
+  // Combine canvas video track + audio track
+  const canvasStream   = canvas.captureStream(30);
+  const combinedStream = new MediaStream([
+    ...canvasStream.getVideoTracks(),
+    ...audioDest.stream.getAudioTracks()
+  ]);
 
-  // Pass 1 — normalise every clip/image into a uniform 1280×720 30fps MP4 segment
-  const dur = String(Math.max(1, Math.round(clipDuration)));
+  const mimeType = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+    .find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : {});
+  const recChunks = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+
+  // Live progress timer — updates every second
+  const totalSecs = audioDuration || videoClips.length * clipDuration;
+  let elapsedSecs = 0;
+  let currentScene = 0;
+  const bar     = get('cstep-package-bar');
+  const barWrap = get('cstep-package-bar-wrap');
+  if (barWrap) barWrap.style.display = 'block';
+  const timerTick = setInterval(() => {
+    elapsedSecs++;
+    const pct  = Math.min(99, Math.round((elapsedSecs / totalSecs) * 100));
+    const eMin = Math.floor(elapsedSecs / 60);
+    const eSec = String(elapsedSecs % 60).padStart(2, '0');
+    const tMin = Math.floor(totalSecs / 60);
+    const tSec = String(Math.round(totalSecs % 60)).padStart(2, '0');
+    if (bar) bar.style.width = `${pct}%`;
+    _cstepSet('package', 'running',
+      `Recording ${eMin}:${eSec} / ~${tMin}:${tSec} · Scene ${currentScene}/${videoClips.length} · ${pct}%`);
+  }, 1000);
+
+  // Start audio and recorder together
+  audioSrc.start(0);
+  recorder.start();
+
+  // Draw each image/clip and hold for clipDuration
   for (let i = 0; i < videoClips.length; i++) {
-    const clip   = videoClips[i];
-    const padded = String(i + 1).padStart(2, '0');
-    const segOut = `seg_${padded}.mp4`;
-    _cstepSet('package', 'running', `Encoding segment ${i + 1} / ${videoClips.length}…`);
-
-    if (clip.data) {
-      ffmpeg.FS('writeFile', `raw_${padded}.mp4`, Uint8Array.from(atob(clip.data), c => c.charCodeAt(0)));
-      await ffmpeg.run(
-        '-t', dur, '-i', `raw_${padded}.mp4`,
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
-        '-s', '1280x720', '-r', '30', '-an', '-y', segOut
-      );
-    } else {
-      ffmpeg.FS('writeFile', `raw_${padded}.png`, Uint8Array.from(atob(existingImages[clip.index].data), c => c.charCodeAt(0)));
-      await ffmpeg.run(
-        '-loop', '1', '-t', dur, '-i', `raw_${padded}.png`,
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
-        '-s', '1280x720', '-r', '30', '-an', '-y', segOut
-      );
-    }
+    currentScene = i + 1;
+    const imgSrc = existingImages[videoClips[i].index ?? i];
+    await new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 1280, 720);
+        const scale = Math.max(1280 / image.width, 720 / image.height);
+        const w = image.width * scale, h = image.height * scale;
+        ctx.drawImage(image, (1280 - w) / 2, (720 - h) / 2, w, h);
+        resolve();
+      };
+      image.onerror = () => { ctx.fillStyle = '#111'; ctx.fillRect(0, 0, 1280, 720); resolve(); };
+      image.src = `data:${imgSrc.mime};base64,${imgSrc.data}`;
+    });
+    await new Promise(resolve => setTimeout(resolve, Math.round(clipDuration * 1000)));
   }
 
-  // Pass 2 — concat all segments + overlay narration
-  const filelistTxt = videoClips.map((_, i) => `file 'seg_${String(i + 1).padStart(2, '0')}.mp4'`).join('\n');
-  ffmpeg.FS('writeFile', 'filelist.txt', new TextEncoder().encode(filelistTxt));
+  // Stop recording
+  recorder.stop();
+  clearInterval(timerTick);
+  await new Promise(resolve => { recorder.onstop = resolve; });
+  audioSrc.stop();
+  audioCtx.close();
 
-  _cstepSet('package', 'running', 'Stitching video with narration…');
-  await ffmpeg.run(
-    '-f', 'concat', '-safe', '0', '-i', 'filelist.txt',
-    '-i', 'narration.wav',
-    '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', 'output.mp4'
-  );
+  if (bar) bar.style.width = '100%';
+  if (barWrap) barWrap.style.display = 'none';
 
-  const outputData = ffmpeg.FS('readFile', 'output.mp4');
-  const mp4Blob    = new Blob([outputData.buffer], { type: 'video/mp4' });
-  const mp4Url     = URL.createObjectURL(mp4Blob);
+  const webmBlob = new Blob(recChunks, { type: 'video/webm' });
+  const webmUrl  = URL.createObjectURL(webmBlob);
 
   const dlBtn = get('compiler-download-btn');
   dlBtn.disabled    = false;
-  dlBtn.textContent = '⬇ Download MP4';
+  dlBtn.textContent = '⬇ Download WebM';
   dlBtn.onclick     = () => {
     const a = document.createElement('a');
-    a.href = mp4Url; a.download = `${videoTitle}.mp4`; a.click();
+    a.href = webmUrl; a.download = `${videoTitle}.webm`; a.click();
   };
 
-  _cstepSet('package', 'done', `✅ MP4 ready — ${mm}m ${ss}s · ${videoClips.length} scenes`);
+  _cstepSet('package', 'done', `✅ Video ready — ${mm}m ${ss}s · ${videoClips.length} scenes`);
   btn.disabled = false;
   btn.textContent = '▶ Run Full Compiler';
-  showToast('MP4 ready — click Download MP4!', 'success');
+  showToast('Video ready — click Download WebM!', 'success');
 }
 
 async function _compilerSegmentWithGemini(script, stylePrefix, wps) {

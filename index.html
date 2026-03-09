@@ -791,7 +791,13 @@
             </div>
             <div class="compiler-step" id="cstep-package">
               <div class="cstep-dot pending"></div>
-              <div class="cstep-body"><div class="cstep-label">Building Package</div><div class="cstep-sub" id="cstep-package-sub">Waiting…</div></div>
+              <div class="cstep-body">
+                <div class="cstep-label">Building Package</div>
+                <div class="cstep-sub" id="cstep-package-sub">Waiting…</div>
+                <div id="cstep-package-bar-wrap" style="display:none;margin-top:6px;background:rgba(255,255,255,0.07);border-radius:4px;height:4px;overflow:hidden;">
+                  <div id="cstep-package-bar" style="height:4px;background:#a78bfa;width:0%;transition:width 1s linear;border-radius:4px;"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -816,13 +822,8 @@
 
           <div class="glass-card" style="margin-top:16px;">
             <div class="glass-card-title">Export</div>
-            <p class="panel-desc">Your video is encoded directly in the browser. Click Download MP4 to save the finished file. The FFmpeg command is also included if you need to re-stitch locally.</p>
-            <button class="ccp-btn primary" id="compiler-download-btn" style="margin-top:14px;width:100%;" disabled>⬇ Download MP4</button>
-            <div style="margin-top:16px;">
-              <label style="margin-top:0;">FFmpeg Assembly Command (for local re-stitch)</label>
-              <textarea id="compiler-ffmpeg-cmd" style="min-height:80px;font-family:monospace;font-size:11px;color:#a78bfa;" readonly></textarea>
-              <button class="ccp-btn copy" id="compiler-copy-ffmpeg-btn" style="margin-top:8px;width:auto;">📋 Copy Command</button>
-            </div>
+            <p class="panel-desc">Your video is recorded directly in the browser using MediaRecorder — no installs needed. Output is a .webm file playable in Chrome, Firefox, and VLC.</p>
+            <button class="ccp-btn primary" id="compiler-download-btn" style="margin-top:14px;width:100%;" disabled>⬇ Download WebM</button>
           </div>
 
         </div>
@@ -886,7 +887,6 @@
 
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
