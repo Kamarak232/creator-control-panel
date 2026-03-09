@@ -2714,7 +2714,7 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
   if (shortenMatch) videoUrl = `https://www.youtube.com/watch?v=${shortenMatch[1]}`;
 
   // Models with confirmed YouTube URL fileData support, tried in order
-  const VIDEO_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash'];
+  const VIDEO_MODELS = ['gemini-2.5-flash', 'gemini-1.5-pro'];
 
   for (let mi = 0; mi < VIDEO_MODELS.length; mi++) {
     const videoModel = VIDEO_MODELS[mi];
@@ -3764,25 +3764,31 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   const apiKey = await _getApiKey();
   if (!apiKey) return { error: 'No API key found. Add your Gemini API key in ⚙️ Settings.' };
 
-  const MODELS = ['gemini-2.5-flash'];
+  // gemini-2.5-flash first; gemini-1.5-flash as fallback (no thinking, always returns text)
+  const MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash'];
 
-  const makeBody = (withSearch) => ({
-    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    ...(withSearch ? { tools: [{ googleSearch: {} }] } : {}),
-    generationConfig: {
-      maxOutputTokens: 16384,
-      temperature,
-      thinkingConfig: { thinkingBudget: 0 }
-    }
-  });
+  // thinkingConfig only on 2.5 models; 1.5 models don't support it
+  const makeBody = (model, withSearch) => {
+    const is25 = model.startsWith('gemini-2.5');
+    return {
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      ...(withSearch ? { tools: [{ googleSearch: {} }] } : {}),
+      generationConfig: {
+        maxOutputTokens: 16384,
+        temperature,
+        ...(is25 ? { thinkingConfig: { thinkingBudget: -1 } } : {})
+      }
+    };
+  };
 
   // Pass 1: with Google Search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 3; i++) {
-      const res = await _geminiRequest(model, makeBody(true));
-      if (!res) continue;
+      const res = await _geminiRequest(model, makeBody(model, true));
+      if (!res) { console.warn('[search] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
+      console.warn('[search]', model, 'status', res.status, res.msg);
       if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break;
       if (res.status === 429 || res.status === 503) continue;
       break;
@@ -3792,10 +3798,11 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   // Pass 2: fallback without search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 2; i++) {
-      const res = await _geminiRequest(model, makeBody(false));
-      if (!res) continue;
+      const res = await _geminiRequest(model, makeBody(model, false));
+      if (!res) { console.warn('[search-no-grounding] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
+      console.warn('[search-no-grounding]', model, 'status', res.status, res.msg);
       if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break;
       if (res.status === 429 || res.status === 503) continue;
       break;
