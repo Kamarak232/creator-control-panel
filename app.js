@@ -4466,8 +4466,29 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
     _cstepSet('tts', 'error', ttsResult.error);
   } else {
     _compilerWavBlob = ttsResult.blob;
-    get('compiler-audio').src = URL.createObjectURL(ttsResult.blob);
-    _cstepSet('tts', 'done', 'Narration ready');
+    const audioUrl = URL.createObjectURL(ttsResult.blob);
+    get('compiler-audio').src = audioUrl;
+
+    // Measure real audio duration and rescale segment timings to match exactly
+    const audioDuration = await new Promise(resolve => {
+      const audio = new Audio(audioUrl);
+      audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
+      audio.addEventListener('error', () => resolve(0));
+      audio.load();
+    });
+
+    if (audioDuration > 0) {
+      const estimatedTotal = segments.reduce((s, seg) => s + seg.duration, 0);
+      const scale = audioDuration / estimatedTotal;
+      segments.forEach(seg => { seg.duration = Math.round(seg.duration * scale * 10) / 10; });
+      const realTotal = segments.reduce((s, seg) => s + seg.duration, 0);
+      console.log(`Audio: ${audioDuration}s | Estimated: ${estimatedTotal}s | Scaled: ${realTotal}s`);
+      const mm = Math.floor(audioDuration / 60);
+      const ss = Math.round(audioDuration % 60);
+      _cstepSet('tts', 'done', `Narration ready · ${mm}m ${ss}s total video length`);
+    } else {
+      _cstepSet('tts', 'done', 'Narration ready');
+    }
   }
 
   // ── Step 5: Build package ─────────────────────────────────────────────
@@ -4489,22 +4510,24 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
 async function _compilerSegmentWithGemini(script, stylePrefix, wps) {
   const SYS = `You are a professional video editor. You read YouTube scripts and break them into precise timed segments for video production. You output clean, structured data with no deviation from the requested format.`;
 
-  const USER = `You are a video editor. I have this script:
+  const USER = `You are a video editor. Break this ENTIRE script into segments — every single word must be covered, nothing skipped. One segment per scene change or [ANIMATION NOTE]. Each segment must have a VOICEOVER that contains the exact spoken words for that moment.
 
+Script:
 ${script}
 
-Break it into segments. For each [ANIMATION NOTE] or scene change, output exactly:
-
+For each segment output exactly:
 SEGMENT [n]
-VOICEOVER: [exact words spoken in this segment]
+VOICEOVER: [exact spoken words for this segment — must cover every word of the script in order]
 WORD COUNT: [n]
-DURATION: [word count ÷ ${wps}, rounded to nearest 0.5s] seconds
-B-ROLL DESCRIPTION: [what should be visually on screen]
-IMAGE PROMPT: ${stylePrefix ? stylePrefix + ' ' : ''}[specific scene description for this segment — describe the exact visual composition, subjects, colours, and atmosphere]
-VEO 3 MOTION: [camera movement and animation instruction for this exact image — e.g. "slow zoom in on the figure", "pan left revealing the landscape", "static shot with dust particles floating"]
+DURATION: [word count ÷ ${wps} rounded to nearest 0.5s] seconds
+B-ROLL DESCRIPTION: [what is visually on screen]
+IMAGE PROMPT: ${stylePrefix ? stylePrefix + ' ' : ''}[detailed visual description]
+VEO 3 MOTION: [camera and motion instruction]
+
+IMPORTANT: Every word of the script must appear in exactly one VOICEOVER field. Do not summarise or skip any content. The sum of all VOICEOVER fields must equal the full script word for word.
 
 End with:
-TOTAL DURATION: [sum of all durations] seconds
+TOTAL DURATION: [sum] seconds
 TOTAL SEGMENTS: [n]
 TOTAL NARRATION WORD COUNT: [n]`;
 
@@ -4700,28 +4723,31 @@ async function _compilerRunTTS(text, voice) {
 }
 
 function _compilerBuildFileList(segments) {
-  return segments.map(s => {
+  return segments.map((s, i) => {
     const ext  = s.videoData ? 'mp4' : 'png';
-    const name = `scene_${String(s.id).padStart(2,'0')}_${s.duration}s.${ext}`;
+    const name = `scene_${String(i + 1).padStart(2, '0')}_${s.duration}s.${ext}`;
     return `file '${name}'\nduration ${s.duration}`;
   }).join('\n');
 }
 
 function _compilerBuildFFmpegCmd(voice, segments) {
-  if (!segments || !segments.some(s => s.videoData)) {
-    // All stills — simple concat
-    return `ffmpeg -f concat -safe 0 -i filelist.txt -i narration-${voice.toLowerCase()}.wav -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest output.mp4`;
-  }
-  // Mixed video clips + still images
-  const inputs = segments.map(s => {
-    const ext  = s.videoData ? 'mp4' : 'png';
-    const name = `scene_${String(s.id).padStart(2,'0')}_${s.duration}s.${ext}`;
-    return s.videoData
-      ? `-t ${s.duration} -i ${name}`
-      : `-loop 1 -t ${s.duration} -i ${name}`;
-  }).join(' ');
+  if (!segments?.length) return '';
   const n = segments.length;
-  return `ffmpeg ${inputs} -i narration-${voice.toLowerCase()}.wav -filter_complex "concat=n=${n}:v=1:a=0[v]" -map "[v]" -map ${n}:a -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest output.mp4`;
+  const inputs = segments.map((seg, i) => {
+    const ext  = seg.videoData ? 'mp4' : 'png';
+    const file = `scene_${String(i + 1).padStart(2, '0')}_${seg.duration}s.${ext}`;
+    return seg.videoData
+      ? `-t ${seg.duration} -i "${file}"`
+      : `-loop 1 -t ${seg.duration} -i "${file}"`;
+  }).join(' \\\n');
+
+  const filterParts = segments.map((_, i) =>
+    `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v${i}]`
+  ).join(';\n');
+
+  const concatInputs = segments.map((_, i) => `[v${i}]`).join('');
+
+  return `ffmpeg \\\n${inputs} \\\n-i "narration-${voice.toLowerCase()}.wav" \\\n-filter_complex "\n${filterParts};\n${concatInputs}concat=n=${n}:v=1:a=0[vout]\n" \\\n-map "[vout]" -map ${n}:a \\\n-c:v libx264 -pix_fmt yuv420p -c:a aac -shortest \\\n-y output.mp4`;
 }
 
 async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt, voice) {
@@ -4734,12 +4760,15 @@ async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt
 
   const zip = new JSZip();
 
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const seg    = segments[i];
+    const padded = String(i + 1).padStart(2, '0');
     if (seg.videoData) {
-      const videoBytes = Uint8Array.from(atob(seg.videoData), c => c.charCodeAt(0));
-      zip.file(`scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.mp4`, videoBytes);
+      const bytes = Uint8Array.from(atob(seg.videoData), c => c.charCodeAt(0));
+      zip.file(`scene_${padded}_${seg.duration}s.mp4`, bytes);
     } else if (seg.imageData) {
-      zip.file(`scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.png`, seg.imageData, { base64: true });
+      const bytes = Uint8Array.from(atob(seg.imageData), c => c.charCodeAt(0));
+      zip.file(`scene_${padded}_${seg.duration}s.png`, bytes);
     }
   }
 
@@ -4752,12 +4781,12 @@ async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt
   const timeline = {
     title: videoTitle,
     total_duration: `${segments.reduce((s, seg) => s + seg.duration, 0)}s`,
-    segments: segments.map(seg => {
+    segments: segments.map((seg, i) => {
       const entry = {
-        id: seg.id,
+        id: i + 1,
         start: startTime.toFixed(1),
         end: (startTime + seg.duration).toFixed(1),
-        file: `scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.${seg.videoData ? 'mp4' : 'png'}`,
+        file: `scene_${String(i + 1).padStart(2, '0')}_${seg.duration}s.${seg.videoData ? 'mp4' : 'png'}`,
         type: seg.videoData ? 'video' : 'image',
         voiceover: seg.voiceover,
         veo3_motion: seg.veo3Motion || '',
