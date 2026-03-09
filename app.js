@@ -2171,6 +2171,39 @@ function getBeatData(niche) {
   try { return JSON.parse(localStorage.getItem(`beatData_${niche}`) || '[]'); } catch { return []; }
 }
 
+function saveBeatImages(niche) {
+  if (!niche) return;
+  const items = document.querySelectorAll('.beat-item');
+  const images = {};
+  items.forEach((el, i) => {
+    const img = el.querySelector('.beat-image');
+    if (img && img.src && img.src.startsWith('data:')) {
+      const comma = img.src.indexOf(',');
+      const mime = img.src.slice(5, img.src.indexOf(';')) || 'image/png';
+      images[i + 1] = { data: img.src.slice(comma + 1), mime };
+    }
+  });
+  try { localStorage.setItem(`beatImages_${niche}`, JSON.stringify(images)); } catch(e) {}
+}
+
+function getBeatImages(niche) {
+  try { return JSON.parse(localStorage.getItem(`beatImages_${niche}`) || '{}'); } catch { return {}; }
+}
+
+function saveVeo3Prompts(niche) {
+  if (!niche) return;
+  const items = document.querySelectorAll('.veo3-item');
+  const prompts = Array.from(items).map((el, i) => ({
+    num: i + 1,
+    text: el.querySelector('.veo3-prompt')?.textContent?.trim() || ''
+  }));
+  try { localStorage.setItem(`veo3Prompts_${niche}`, JSON.stringify(prompts)); } catch(e) {}
+}
+
+function getVeo3Prompts(niche) {
+  try { return JSON.parse(localStorage.getItem(`veo3Prompts_${niche}`) || '[]'); } catch { return []; }
+}
+
 function copyAllBeats() {
   const items = document.querySelectorAll('.beat-item');
   if (!items.length) return;
@@ -2272,6 +2305,7 @@ async function renderBeatImage(btn) {
     </div>
   `;
   item.appendChild(wrap);
+  if (!result.error) saveBeatImages(currentNiche);
 }
 
 async function renderAllBeats() {
@@ -3972,6 +4006,7 @@ function renderVeo3Output(text, beatItems) {
     `;
     list.appendChild(item);
   });
+  saveVeo3Prompts(currentNiche);
 }
 
 function copyAllVeo3() {
@@ -4234,7 +4269,7 @@ async function runVideoCompiler() {
   get('compiler-progress').style.display = 'block';
   get('compiler-results').style.display  = 'none';
   get('compiler-progress').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  ['style','segment','images','tts','package'].forEach(s => _cstepSet(s, 'pending', 'Waiting…'));
+  ['style','segment','images','video','tts','package'].forEach(s => _cstepSet(s, 'pending', 'Waiting…'));
 
   // ── Step 1: Style extraction ───────────────────────────────────────────
   const _styleExtractSYS = 'You are a creative director specialising in YouTube animation. You analyse references and produce precise, replicable animation style guides that can be used to recreate the exact visual look of every frame.';
@@ -4317,24 +4352,65 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
   _compilerRenderSegmentList(segments);
   get('compiler-results').style.display = 'block';
 
-  // ── Step 3: Image generation + style verification ────────────────────
-  _cstepSet('images', 'running', `Rendering 0 / ${segments.length}…`);
-  let imgDone = 0, imgFlagged = 0;
-  for (const seg of segments) {
-    _cstepSet('images', 'running', `Rendering ${imgDone + 1} / ${segments.length}…`);
+  // ── Step 3: Images — pull from DOM / localStorage, generate only what's missing ──
+  _cstepSet('images', 'running', `Processing 0 / ${segments.length}…`);
 
+  // Collect already-rendered images from Image Planner DOM (most current source)
+  const _domImages = [];
+  document.querySelectorAll('.beat-image').forEach(img => {
+    if (img.src && img.src.startsWith('data:')) {
+      const comma = img.src.indexOf(',');
+      const mime  = img.src.slice(5, img.src.indexOf(';')) || 'image/png';
+      _domImages.push({ data: img.src.slice(comma + 1), mime });
+    }
+  });
+
+  // Collect Veo 3 prompts from DOM (most current source)
+  const _domVeo3 = [];
+  document.querySelectorAll('.veo3-prompt').forEach(el => {
+    _domVeo3.push(el.textContent.trim());
+  });
+
+  // Fallback to localStorage if DOM is empty (e.g. user navigated away)
+  const _lsImages = _domImages.length ? null : getBeatImages(currentNiche || 'other');
+  const _lsVeo3   = _domVeo3.length   ? null : getVeo3Prompts(currentNiche || 'other');
+
+  // Assign Veo 3 prompts to segments
+  for (let i = 0; i < segments.length; i++) {
+    const v3 = _domVeo3[i] || _lsVeo3?.[i]?.text || '';
+    if (v3) segments[i].veo3Motion = v3;
+  }
+
+  let imgDone = 0, imgFlagged = 0, imgReused = 0;
+  for (let _si = 0; _si < segments.length; _si++) {
+    const seg = segments[_si];
+    _cstepSet('images', 'running', `Processing ${_si + 1} / ${segments.length}…`);
+
+    // Try DOM image first, then localStorage fallback
+    const domImg = _domImages[_si];
+    const lsImg  = _lsImages ? _lsImages[_si + 1] : null;
+    if (domImg?.data || lsImg?.data) {
+      const src = domImg || lsImg;
+      seg.imageData   = src.data;
+      seg.imageMime   = src.mime || 'image/png';
+      seg.imageError  = null;
+      seg.imageReused = true;
+      imgReused++;
+      imgDone++;
+      _compilerUpdateSegmentImage(seg);
+      continue;
+    }
+
+    // No pre-existing image — generate one
     let r = await nanoBananaRender({ prompt: seg.imagePrompt });
 
     if (!r.error && r.imageData) {
-      // Verify rendered image matches style guide
       _cstepSet('images', 'running', `Verifying scene ${seg.id}…`);
       const check = await _compilerVerifyImage(r.imageData, r.mimeType, _compilerStyleGuide, seg.animNote);
-
       if (!check.pass && check.correctedPrompt) {
         imgFlagged++;
         seg.imageFlagged = true;
         seg.flagReason   = check.reason || 'Style deviation detected';
-        // Retry once with Gemini-corrected prompt
         _cstepSet('images', 'running', `Correcting scene ${seg.id}…`);
         const r2 = await nanoBananaRender({ prompt: check.correctedPrompt });
         if (!r2.error && r2.imageData) {
@@ -4351,8 +4427,51 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
     imgDone++;
     _compilerUpdateSegmentImage(seg);
   }
-  const flagNote = imgFlagged ? ` · ${imgFlagged} corrected` : '';
-  _cstepSet('images', 'done', `${imgDone} images rendered${flagNote}`);
+  const reuseNote = imgReused ? ` · ${imgReused} from Image Planner` : '';
+  const flagNote  = imgFlagged ? ` · ${imgFlagged} corrected` : '';
+  _cstepSet('images', 'done', `${imgDone} images ready${reuseNote}${flagNote}`);
+
+  // ── Step 3.5: Veo 3 video clip generation ────────────────────────────
+  _cstepSet('video', 'running', `Generating video clips…`);
+  let videosDone = 0, videosSkipped = 0;
+  const _veoApiKey = await _getApiKey();
+  for (let _vi = 0; _vi < segments.length; _vi++) {
+    const seg = segments[_vi];
+    if (!seg.imageData) { videosSkipped++; continue; }
+    _cstepSet('video', 'running', `Generating clip ${_vi + 1} / ${segments.length}…`);
+    try {
+      const veoEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateContent?key=${_veoApiKey}`;
+      const veoRes = await fetch(veoEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inlineData: { mimeType: seg.imageMime, data: seg.imageData } },
+            { text: seg.veo3Motion || 'Slow cinematic motion, subtle camera movement' }
+          ]}],
+          generationConfig: { durationSeconds: Math.min(Math.round(seg.duration), 8) }
+        })
+      });
+      const veoData = await veoRes.json();
+      const videoPart = veoData?.candidates?.[0]?.content?.parts?.[0];
+      const videoBytes = videoPart?.fileData || videoPart?.inlineData;
+      if (videoBytes?.data) {
+        seg.videoData = videoBytes.data;
+        seg.videoMime = videoBytes.mimeType || 'video/mp4';
+        videosDone++;
+      } else {
+        videosSkipped++;
+      }
+    } catch (e) {
+      seg.videoError = e.message;
+      videosSkipped++;
+    }
+  }
+  if (videosDone > 0) {
+    _cstepSet('video', 'done', `${videosDone} clips generated · ${videosSkipped} used still image`);
+  } else {
+    _cstepSet('video', 'done', `No clips generated — still images will be used with Ken Burns zoom`);
+  }
 
   // ── Step 4: TTS narration ─────────────────────────────────────────────
   _cstepSet('tts', 'running', 'Generating narration…');
@@ -4369,7 +4488,7 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
   // ── Step 5: Build package ─────────────────────────────────────────────
   _cstepSet('package', 'running', 'Building package…');
   const videoTitle  = get('compiler-title').value.trim() || 'Untitled Video';
-  const ffmpegCmd   = _compilerBuildFFmpegCmd(voice);
+  const ffmpegCmd   = _compilerBuildFFmpegCmd(voice, segments);
   const filelistTxt = _compilerBuildFileList(segments);
   get('compiler-ffmpeg-cmd').value = ffmpegCmd;
   get('compiler-download-btn').onclick = () => _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt, voice);
@@ -4596,13 +4715,28 @@ async function _compilerRunTTS(text, voice) {
 }
 
 function _compilerBuildFileList(segments) {
-  return segments.map(s =>
-    `file 'scene_${String(s.id).padStart(2,'0')}_${s.duration}s.png'\nduration ${s.duration}`
-  ).join('\n');
+  return segments.map(s => {
+    const ext  = s.videoData ? 'mp4' : 'png';
+    const name = `scene_${String(s.id).padStart(2,'0')}_${s.duration}s.${ext}`;
+    return `file '${name}'\nduration ${s.duration}`;
+  }).join('\n');
 }
 
-function _compilerBuildFFmpegCmd(voice) {
-  return `ffmpeg -f concat -safe 0 -i filelist.txt -i narration-${voice.toLowerCase()}.wav -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest output.mp4`;
+function _compilerBuildFFmpegCmd(voice, segments) {
+  if (!segments || !segments.some(s => s.videoData)) {
+    // All stills — simple concat
+    return `ffmpeg -f concat -safe 0 -i filelist.txt -i narration-${voice.toLowerCase()}.wav -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest output.mp4`;
+  }
+  // Mixed video clips + still images
+  const inputs = segments.map(s => {
+    const ext  = s.videoData ? 'mp4' : 'png';
+    const name = `scene_${String(s.id).padStart(2,'0')}_${s.duration}s.${ext}`;
+    return s.videoData
+      ? `-t ${s.duration} -i ${name}`
+      : `-loop 1 -t ${s.duration} -i ${name}`;
+  }).join(' ');
+  const n = segments.length;
+  return `ffmpeg ${inputs} -i narration-${voice.toLowerCase()}.wav -filter_complex "concat=n=${n}:v=1:a=0[v]" -map "[v]" -map ${n}:a -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest output.mp4`;
 }
 
 async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt, voice) {
@@ -4616,8 +4750,12 @@ async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt
   const zip = new JSZip();
 
   for (const seg of segments) {
-    if (!seg.imageData) continue;
-    zip.file(`scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.png`, seg.imageData, { base64: true });
+    if (seg.videoData) {
+      const videoBytes = Uint8Array.from(atob(seg.videoData), c => c.charCodeAt(0));
+      zip.file(`scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.mp4`, videoBytes);
+    } else if (seg.imageData) {
+      zip.file(`scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.png`, seg.imageData, { base64: true });
+    }
   }
 
   const wavFilename = `narration-${voice.toLowerCase()}.wav`;
@@ -4634,7 +4772,8 @@ async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt
         id: seg.id,
         start: startTime.toFixed(1),
         end: (startTime + seg.duration).toFixed(1),
-        image: `scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.png`,
+        file: `scene_${String(seg.id).padStart(2,'0')}_${seg.duration}s.${seg.videoData ? 'mp4' : 'png'}`,
+        type: seg.videoData ? 'video' : 'image',
         voiceover: seg.voiceover,
         veo3_motion: seg.veo3Motion || '',
         text_overlay: seg.textOverlay || null,
@@ -4647,6 +4786,8 @@ async function _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt
   zip.file('filelist.txt', filelistTxt);
   zip.file('ffmpeg_stitch.txt', ffmpegCmd);
   zip.file('style_guide.txt', _compilerStyleGuide);
+  const _zipVeo3 = segments.filter(s => s.veo3Motion).map((s, i) => `Veo 3 Prompt ${i + 1}:\n${s.veo3Motion}`).join('\n\n');
+  if (_zipVeo3) zip.file('veo3_motion_prompts.txt', _zipVeo3);
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
