@@ -1810,6 +1810,11 @@ Output a single dense paragraph (6–10 sentences) combining all of the above in
   if (result.error) return showToast(result.error, 'error');
 
   _styleReferencePromptOther = result.text.trim();
+  _styleReferencePrompt      = _styleReferencePromptOther;
+  currentOtherVisualStyleGuide = _styleReferencePromptOther;
+  _compilerStyleGuide          = _styleReferencePromptOther;
+  try { localStorage.setItem('styleGuide', _styleReferencePromptOther); } catch(e) {}
+  updateStyleLockBadge();
   get('style-ref-text-other').textContent = _styleReferencePromptOther;
   get('style-ref-preview-other').style.display = 'block';
   // Clear the URL field when an image was uploaded — compiler will use the image instead
@@ -2251,8 +2256,9 @@ async function renderBeatImage(btn) {
 
   const noBlackBody = `CRITICAL: No character or figure may have a solid black body — bodies must show skin tone, clothing colour, or visible line-art. A silhouette-style solid black body is forbidden.`;
 
-  const _recBaseMatch = currentOtherVisualStyleGuide
-    ? currentOtherVisualStyleGuide.match(/RECREATION PROMPT BASE[:\s]+(.+)/i)
+  const _styleGuideSource = currentOtherVisualStyleGuide || _compilerStyleGuide || localStorage.getItem('styleGuide') || '';
+  const _recBaseMatch = _styleGuideSource
+    ? _styleGuideSource.match(/RECREATION PROMPT BASE[:\s]+(.+)/i)
     : null;
   const _recBase = _recBaseMatch ? _recBaseMatch[1].trim() : null;
 
@@ -2272,10 +2278,16 @@ async function renderBeatImage(btn) {
   btn.textContent = '⏳ Rendering…';
   item.querySelector('.beat-image-wrap')?.remove();
 
-  const result = await nanoBananaRender({
+  let result = await nanoBananaRender({
     prompt: fullPrompt,
     referenceImages: refImages.length > 0 ? refImages : undefined
   });
+
+  // Verify style match and retry once if it deviates
+  if (!result.error && result.imageData) {
+    const verified = await _verifyAndCorrectImage(result.imageData, result.mimeType, fullPrompt);
+    result = { ...result, imageData: verified.imageData, mimeType: verified.imageMime };
+  }
 
   btn.disabled = false;
   btn.textContent = '🎨 Render';
@@ -3089,6 +3101,11 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
 
   if (!styleGuideResult.error && styleGuideResult.text) {
     currentOtherVisualStyleGuide = styleGuideResult.text;
+    _styleReferencePromptOther   = styleGuideResult.text;
+    _styleReferencePrompt        = styleGuideResult.text;
+    _compilerStyleGuide          = styleGuideResult.text;
+    try { localStorage.setItem('styleGuide', styleGuideResult.text); } catch(e) {}
+    updateStyleLockBadge();
   }
 
   btn.disabled = false;
@@ -4205,6 +4222,16 @@ function restoreSettings() {
   const supadataKey = localStorage.getItem('supadataKey');
   const model       = localStorage.getItem('model');
 
+  // Restore saved style guide so all tabs share it across page loads
+  const savedStyle = localStorage.getItem('styleGuide');
+  if (savedStyle) {
+    _styleReferencePrompt        = savedStyle;
+    _styleReferencePromptOther   = savedStyle;
+    currentOtherVisualStyleGuide = savedStyle;
+    _compilerStyleGuide          = savedStyle;
+    updateStyleLockBadge();
+  }
+
   if (geminiKey) {
     const input = get('gemini-key-input');
     if (input) input.value = geminiKey;
@@ -4279,7 +4306,13 @@ async function runVideoCompiler() {
     btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
     return showToast('No images found. Run the Image Planner and render your beats first.', 'error');
   }
-  _cstepSet('style', 'done', `${existingImages.length} images loaded`);
+
+  // Show active style guide in the UI
+  const activeStyle = _compilerStyleGuide || currentOtherVisualStyleGuide || localStorage.getItem('styleGuide') || '';
+  const styleOutputEl = get('compiler-style-output');
+  if (styleOutputEl) styleOutputEl.textContent = activeStyle || '(No style guide loaded — extract one in the Image Planner first)';
+  get('compiler-results').style.display = 'block';
+  _cstepSet('style', 'done', activeStyle ? `✅ Style locked — ${existingImages.length} images loaded` : `${existingImages.length} images loaded (no style guide)`);
 
   // ── Step 2: Collect Veo 3 prompts from Veo 3 tab ─────────────────────
   _cstepSet('segment', 'running', 'Loading Veo 3 prompts…');
@@ -4550,6 +4583,20 @@ function _compilerUpdateSegmentImage(seg) {
       ${badge}
       <a class="cseg-dl" href="data:${seg.imageMime};base64,${seg.imageData}" download="${filename}">⬇</a>`;
   }
+}
+
+async function _verifyAndCorrectImage(imageData, imageMime, originalPrompt) {
+  const guide = _compilerStyleGuide || currentOtherVisualStyleGuide || localStorage.getItem('styleGuide') || '';
+  if (!guide || !imageData) return { imageData, imageMime };
+  const m = guide.match(/RECREATION PROMPT BASE[:\s]+(.+)/is);
+  const styleBase = m ? m[1].trim() : '';
+  const check = await _compilerVerifyImage(imageData, imageMime, guide, originalPrompt);
+  if (check.pass) return { imageData, imageMime };
+  const strictPrompt = styleBase
+    ? `STRICT STYLE LOCK — do not deviate from this style under any circumstances: ${styleBase}\n\nScene: ${originalPrompt}\n\nIMPORTANT: Match the art style, colour palette, lighting, and mood exactly as described above.`
+    : originalPrompt;
+  const r2 = await nanoBananaRender({ prompt: strictPrompt });
+  return r2.imageData ? { imageData: r2.imageData, imageMime: r2.mimeType } : { imageData, imageMime };
 }
 
 async function _compilerVerifyImage(imageData, mimeType, styleGuide, sceneDesc) {
