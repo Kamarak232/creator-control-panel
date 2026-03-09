@@ -2714,7 +2714,7 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
   if (shortenMatch) videoUrl = `https://www.youtube.com/watch?v=${shortenMatch[1]}`;
 
   // Models with confirmed YouTube URL fileData support, tried in order
-  const VIDEO_MODELS = ['gemini-2.5-flash', 'gemini-1.5-pro'];
+  const VIDEO_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   for (let mi = 0; mi < VIDEO_MODELS.length; mi++) {
     const videoModel = VIDEO_MODELS[mi];
@@ -3765,8 +3765,8 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   const apiKey = await _getApiKey();
   if (!apiKey) return { error: 'No API key found. Add your Gemini API key in ⚙️ Settings.' };
 
-  // gemini-2.5-flash first; gemini-1.5-flash-latest as fallback
-  const MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash-latest'];
+  // gemini-2.5-flash first; gemini-2.0-flash as fallback
+  const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   // No thinkingConfig — 2.5-flash default dynamic thinking returns thought+text parts;
   // _geminiRequest already strips thought parts and returns only text.
