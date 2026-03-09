@@ -1,7 +1,7 @@
 // Creator Control Panel — Web App
 // All Gemini API calls made directly from the browser (no extension background needed).
 
-const GEMINI_TEXT_MODEL = 'gemini-2.0-flash';
+const GEMINI_TEXT_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Returns true if API calls can be made (personal key stored, or deployed on Netlify with server-side key)
