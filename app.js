@@ -219,20 +219,32 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
 async function geminiTTS({ text, voice }) {
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 30000);
+
   try {
-    const response = await _geminiFetch('gemini-2.5-flash-preview-tts', {
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
+    const key = await _getApiKey();
+    const response = await fetch(
+      `${GEMINI_BASE}/gemini-2.5-flash-preview-tts:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
           }
-        }
-      });
+        }),
+        signal: controller.signal
+      }
+    );
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
+      console.error('[TTS] API error:', response.status, msg);
       return { error: `Gemini TTS Error: ${msg}` };
     }
 
@@ -241,13 +253,17 @@ async function geminiTTS({ text, voice }) {
     const audioParts = parts.filter(p => p.inlineData?.data);
 
     if (!audioParts.length) {
+      console.error('[TTS] No audio parts in response:', JSON.stringify(data).slice(0, 300));
       return { error: `No audio returned. Response: ${JSON.stringify(data).slice(0, 200)}` };
     }
 
     const mimeType = audioParts[0].inlineData.mimeType || 'audio/pcm;rate=24000';
     return { audioParts: audioParts.map(p => p.inlineData.data), mimeType };
   } catch (err) {
-    return { error: `Network Error: ${err.message}` };
+    clearTimeout(timeoutId);
+    const msg = err.name === 'AbortError' ? 'TTS request timed out after 30s' : `Network Error: ${err.message}`;
+    console.error('[TTS] catch:', msg);
+    return { error: msg };
   }
 }
 
@@ -4719,9 +4735,15 @@ async function _compilerRunTTS(text, voice) {
 
   const allPcm = []; let sampleRate = 24000;
   for (let i = 0; i < chunks.length; i++) {
-    _cstepSet('tts', 'running', `Part ${i + 1} of ${chunks.length}…`);
+    const wordCount = chunks[i].split(/\s+/).length;
+    _cstepSet('tts', 'running', `Part ${i + 1} of ${chunks.length} (${wordCount} words)…`);
+    console.log(`[TTS] chunk ${i + 1}/${chunks.length}, ${wordCount} words`);
     const r = await geminiTTS({ text: chunks[i], voice });
-    if (r.error) return { error: r.error };
+    if (r.error) {
+      console.error(`[TTS] chunk ${i + 1} failed:`, r.error);
+      _cstepSet('tts', 'error', `Part ${i + 1} failed: ${r.error}`);
+      return { error: `Part ${i + 1} of ${chunks.length}: ${r.error}` };
+    }
     sampleRate = parseInt(r.mimeType?.match(/rate=(\d+)/)?.[1] || '24000');
     for (const b64 of r.audioParts) allPcm.push(base64ToBytes(b64));
   }
