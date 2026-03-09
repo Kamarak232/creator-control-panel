@@ -3782,13 +3782,16 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
     };
   };
 
+  let lastErr = 'no response';
+
   // Pass 1: with Google Search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 3; i++) {
       const res = await _geminiRequest(model, makeBody(model, true));
-      if (!res) { console.warn('[search] null response from', model, 'attempt', i); continue; }
+      if (!res) { lastErr = `${model}: thought-only`; console.warn('[search] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
+      lastErr = `${model}: ${res.status} ${res.msg}`;
       console.warn('[search]', model, 'status', res.status, res.msg);
       if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break;
       if (res.status === 429 || res.status === 503) continue;
@@ -3800,9 +3803,10 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   for (const model of MODELS) {
     for (let i = 0; i < 2; i++) {
       const res = await _geminiRequest(model, makeBody(model, false));
-      if (!res) { console.warn('[search-no-grounding] null response from', model, 'attempt', i); continue; }
+      if (!res) { lastErr = `${model}: thought-only`; console.warn('[search-no-grounding] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
+      lastErr = `${model}: ${res.status} ${res.msg}`;
       console.warn('[search-no-grounding]', model, 'status', res.status, res.msg);
       if (res.status === 404 || /no longer available|new user|deprecated/i.test(res.msg || '')) break;
       if (res.status === 429 || res.status === 503) continue;
@@ -3810,7 +3814,7 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
     }
   }
 
-  return { error: 'Gemini did not return a response. Please try again.' };
+  return { error: `Gemini did not return a response (${lastErr}). Please try again.` };
 }
 
 async function findFreshTopic(niche) {
