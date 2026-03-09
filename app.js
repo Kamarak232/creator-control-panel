@@ -3746,11 +3746,12 @@ async function _geminiRequest(model, body) {
     if (data?.promptFeedback?.blockReason) return { blocked: data.promptFeedback.blockReason };
     const candidate = data?.candidates?.[0];
     if (!candidate) return null;
-    const text = (candidate?.content?.parts || [])
-      .filter(p => !p.thought)
-      .map(p => p.text || '')
-      .join('')
-      .trim();
+    const allParts = candidate?.content?.parts || [];
+    const textParts = allParts.filter(p => !p.thought);
+    if (textParts.length === 0 && allParts.length > 0) {
+      console.warn('[gemini]', model, 'response contained only thought parts');
+    }
+    const text = textParts.map(p => p.text || '').join('').trim();
     return text ? { text } : null;
   } catch (e) {
     console.warn('[gemini] fetch error', e.message);
@@ -3764,8 +3765,8 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   const apiKey = await _getApiKey();
   if (!apiKey) return { error: 'No API key found. Add your Gemini API key in ⚙️ Settings.' };
 
-  // gemini-2.5-flash first; gemini-1.5-flash as fallback (no thinking, always returns text)
-  const MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  // gemini-2.5-flash first; gemini-2.0-flash and gemini-1.5-flash as fallbacks
+  const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 
   // thinkingConfig only on 2.5 models; 1.5 models don't support it
   const makeBody = (model, withSearch) => {
@@ -3776,7 +3777,7 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
       generationConfig: {
         maxOutputTokens: 16384,
         temperature,
-        ...(is25 ? { thinkingConfig: { thinkingBudget: -1 } } : {})
+        ...(is25 ? { thinkingConfig: { thinkingBudget: 0 } } : {})
       }
     };
   };
