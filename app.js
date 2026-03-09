@@ -1,7 +1,7 @@
 // Creator Control Panel — Web App
 // All Gemini API calls made directly from the browser (no extension background needed).
 
-const GEMINI_TEXT_MODEL = 'gemini-2.5-pro';
+const GEMINI_TEXT_MODEL = 'gemini-2.0-flash';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Returns true if API calls can be made (personal key stored, or deployed on Netlify with server-side key)
@@ -79,13 +79,11 @@ async function callGemini(systemPrompt, userPrompt) {
   // Build up conversation turns for continuation calls
   const contents = [{ role: 'user', parts: [{ text: userPrompt }] }];
 
-  // Allow up to 3 continuation passes to handle long outputs
-  for (let pass = 0; pass < 3; pass++) {
+  // Allow up to 2 continuation passes to handle long outputs
+  for (let pass = 0; pass < 2; pass++) {
     let lastError = null;
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
-
+    for (let attempt = 0; attempt < 1; attempt++) {
       try {
         const response = await _geminiFetch(model, {
             system_instruction: { parts: [{ text: systemPrompt }] },
@@ -94,7 +92,6 @@ async function callGemini(systemPrompt, userPrompt) {
           });
 
         if (response.status === 503 || response.status === 429) {
-          if (attempt === 0) continue;
           return { error: 'Gemini API is overloaded. Please wait a moment and try again.' };
         }
 
@@ -109,9 +106,9 @@ async function callGemini(systemPrompt, userPrompt) {
         const chunk = candidate?.content?.parts?.[0]?.text || '';
         const finishReason = candidate?.finishReason;
 
-        // Empty on first real pass with no prior text — retry once before giving up
+        // Empty on first real pass — retry once before giving up
         if (!chunk) {
-          if (pass === 0 && attempt === 0) { attempt--; await new Promise(r => setTimeout(r, 2000)); continue; }
+          if (pass === 0 && attempt === 0) { attempt--; continue; }
           if (!fullText) return { error: 'Empty response from Gemini API.' };
           return { text: fullText };
         }
@@ -2099,21 +2096,18 @@ Rules:
     { from: half + 1, to: totalCount },
   ];
 
-  let combinedText = '';
+  btn.disabled = true;
+  btn.textContent = `⏳ Generating ${totalCount} prompts…`;
 
-  for (let i = 0; i < batches.length; i++) {
-    const { from, to } = batches[i];
-    btn.disabled = true;
-    btn.textContent = `⏳ Batch ${i + 1} of 2 (prompts ${from}–${to})…`;
+  const batchResults = await Promise.all(batches.map(({ from, to }) => callGemini(SYSTEM, makePrompt(from, to))));
 
-    const result = await callGemini(SYSTEM, makePrompt(from, to));
-
-    if (result.error) {
-      setLoading(btn, '🖼 Plan Visual Beats', false);
-      return showToast(result.error, 'error');
-    }
-    combinedText += (combinedText ? '\n\n' : '') + result.text.trim();
+  const failed = batchResults.find(r => r.error);
+  if (failed) {
+    setLoading(btn, '🖼 Plan Visual Beats', false);
+    return showToast(failed.error, 'error');
   }
+
+  const combinedText = batchResults.map(r => r.text.trim()).join('\n\n');
 
   setLoading(btn, '🖼 Plan Visual Beats', false);
   renderBeatsPlainText(combinedText);
@@ -2713,7 +2707,6 @@ async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
 
     for (let pass = 0; pass < 3; pass++) {
       for (let attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 3000));
         try {
           const response = await _geminiFetch(videoModel, {
               system_instruction: { parts: [{ text: systemPrompt }] },
@@ -3757,7 +3750,6 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   // Pass 1: with Google Search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 3; i++) {
-      if (i > 0) await new Promise(r => setTimeout(r, 4000));
       const res = await _geminiRequest(model, makeBody(true));
       if (!res) continue;
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
@@ -3771,7 +3763,6 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   // Pass 2: fallback without search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 2; i++) {
-      if (i > 0) await new Promise(r => setTimeout(r, 3000));
       const res = await _geminiRequest(model, makeBody(false));
       if (!res) continue;
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
@@ -4381,11 +4372,8 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
     if (v3) segments[i].veo3Motion = v3;
   }
 
-  let imgDone = 0, imgFlagged = 0, imgReused = 0;
-  for (let _si = 0; _si < segments.length; _si++) {
-    const seg = segments[_si];
-    _cstepSet('images', 'running', `Processing ${_si + 1} / ${segments.length}…`);
-
+  let imgFlagged = 0, imgReused = 0;
+  await Promise.all(segments.map(async (seg, _si) => {
     // Try DOM image first, then localStorage fallback
     const domImg = _domImages[_si];
     const lsImg  = _lsImages ? _lsImages[_si + 1] : null;
@@ -4396,22 +4384,19 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
       seg.imageError  = null;
       seg.imageReused = true;
       imgReused++;
-      imgDone++;
       _compilerUpdateSegmentImage(seg);
-      continue;
+      return;
     }
 
     // No pre-existing image — generate one
     let r = await nanoBananaRender({ prompt: seg.imagePrompt });
 
     if (!r.error && r.imageData) {
-      _cstepSet('images', 'running', `Verifying scene ${seg.id}…`);
       const check = await _compilerVerifyImage(r.imageData, r.mimeType, _compilerStyleGuide, seg.animNote);
       if (!check.pass && check.correctedPrompt) {
         imgFlagged++;
         seg.imageFlagged = true;
         seg.flagReason   = check.reason || 'Style deviation detected';
-        _cstepSet('images', 'running', `Correcting scene ${seg.id}…`);
         const r2 = await nanoBananaRender({ prompt: check.correctedPrompt });
         if (!r2.error && r2.imageData) {
           r = r2;
@@ -4424,9 +4409,9 @@ RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 t
     seg.imageData  = r.imageData || null;
     seg.imageMime  = r.mimeType  || 'image/png';
     seg.imageError = r.error     || null;
-    imgDone++;
     _compilerUpdateSegmentImage(seg);
-  }
+  }));
+  const imgDone   = segments.filter(s => s.imageData).length;
   const reuseNote = imgReused ? ` · ${imgReused} from Image Planner` : '';
   const flagNote  = imgFlagged ? ` · ${imgFlagged} corrected` : '';
   _cstepSet('images', 'done', `${imgDone} images ready${reuseNote}${flagNote}`);
