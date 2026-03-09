@@ -815,11 +815,11 @@
           </div>
 
           <div class="glass-card" style="margin-top:16px;">
-            <div class="glass-card-title">Export Package</div>
-            <p class="panel-desc">ZIP contains all rendered images named <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">scene_01_5.5s.png</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">narration.wav</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">timeline.json</code>, <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">filelist.txt</code>, and <code style="color:#a78bfa;background:rgba(124,58,237,0.1);padding:1px 5px;border-radius:3px;">ffmpeg_stitch.txt</code>. Run the single FFmpeg command and your video is done.</p>
-            <button class="ccp-btn primary" id="compiler-download-btn" style="margin-top:14px;width:100%;">⬇ Download Package ZIP</button>
+            <div class="glass-card-title">Export</div>
+            <p class="panel-desc">Your video is encoded directly in the browser. Click Download MP4 to save the finished file. The FFmpeg command is also included if you need to re-stitch locally.</p>
+            <button class="ccp-btn primary" id="compiler-download-btn" style="margin-top:14px;width:100%;" disabled>⬇ Download MP4</button>
             <div style="margin-top:16px;">
-              <label style="margin-top:0;">FFmpeg Assembly Command</label>
+              <label style="margin-top:0;">FFmpeg Assembly Command (for local re-stitch)</label>
               <textarea id="compiler-ffmpeg-cmd" style="min-height:80px;font-family:monospace;font-size:11px;color:#a78bfa;" readonly></textarea>
               <button class="ccp-btn copy" id="compiler-copy-ffmpeg-btn" style="margin-top:8px;width:auto;">📋 Copy Command</button>
             </div>
@@ -886,6 +886,7 @@
 
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

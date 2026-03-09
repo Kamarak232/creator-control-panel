@@ -4397,54 +4397,92 @@ async function runVideoCompiler() {
   _cstepSet('images', 'done', `${successCount}/${existingImages.length} clips generated`);
   _cstepSet('video', 'done', successCount < existingImages.length ? `${existingImages.length - successCount} fell back to still image` : 'All clips ready');
 
-  // ── Step 5: Build ZIP with clips + narration + FFmpeg stitch command ───
-  _cstepSet('package', 'running', 'Building video package…');
-  const JSZip = window.JSZip;
-  if (!JSZip) {
-    _cstepSet('package', 'error', 'JSZip not available');
+  // ── Step 5: Encode MP4 in-browser with FFmpeg.wasm ───────────────────
+  _cstepSet('package', 'running', 'Loading video encoder…');
+  get('compiler-results').style.display = 'block';
+  get('compiler-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const videoTitle = get('compiler-title').value.trim() || 'video';
+  const ffmpegCmd  = `ffmpeg -f concat -safe 0 -i filelist.txt -i narration.wav -c:v copy -c:a aac -shortest -y output.mp4`;
+  get('compiler-ffmpeg-cmd').value = ffmpegCmd;
+  get('compiler-copy-ffmpeg-btn').onclick = () => { copyText(ffmpegCmd); showToast('FFmpeg command copied!'); };
+
+  const FFmpegLib = window.FFmpeg;
+  if (!FFmpegLib?.createFFmpeg) {
+    _cstepSet('package', 'error', 'FFmpeg.wasm did not load — check your connection and reload');
     btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
-    return showToast('JSZip unavailable — reload the page and try again.', 'error');
+    return showToast('Video encoder failed to load. Reload the page and try again.', 'error');
   }
-  const zip = new JSZip();
 
-  zip.file('narration.wav', await _compilerWavBlob.arrayBuffer());
+  const ffmpeg = FFmpegLib.createFFmpeg({
+    log: false,
+    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+  });
 
-  const fileList = [];
-  for (const clip of videoClips) {
-    const padded = String(clip.index + 1).padStart(2, '0');
+  try {
+    _cstepSet('package', 'running', 'Loading encoder (first load ~30s, then cached)…');
+    await ffmpeg.load();
+  } catch (e) {
+    _cstepSet('package', 'error', `Encoder load failed: ${e.message}`);
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast(`Encoder failed to load: ${e.message}`, 'error');
+  }
+
+  // Write narration
+  ffmpeg.FS('writeFile', 'narration.wav', new Uint8Array(await _compilerWavBlob.arrayBuffer()));
+
+  // Pass 1 — normalise every clip/image into a uniform 1280×720 30fps MP4 segment
+  const dur = String(Math.max(1, Math.round(clipDuration)));
+  for (let i = 0; i < videoClips.length; i++) {
+    const clip   = videoClips[i];
+    const padded = String(i + 1).padStart(2, '0');
+    const segOut = `seg_${padded}.mp4`;
+    _cstepSet('package', 'running', `Encoding segment ${i + 1} / ${videoClips.length}…`);
+
     if (clip.data) {
-      const bytes = Uint8Array.from(atob(clip.data), c => c.charCodeAt(0));
-      zip.file(`clip_${padded}.mp4`, bytes);
-      fileList.push(`file 'clip_${padded}.mp4'`);
+      ffmpeg.FS('writeFile', `raw_${padded}.mp4`, Uint8Array.from(atob(clip.data), c => c.charCodeAt(0)));
+      await ffmpeg.run(
+        '-t', dur, '-i', `raw_${padded}.mp4`,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+        '-s', '1280x720', '-r', '30', '-an', '-y', segOut
+      );
     } else {
-      const bytes = Uint8Array.from(atob(existingImages[clip.index].data), c => c.charCodeAt(0));
-      zip.file(`clip_${padded}.png`, bytes);
-      fileList.push(`file 'clip_${padded}.png'`);
+      ffmpeg.FS('writeFile', `raw_${padded}.png`, Uint8Array.from(atob(existingImages[clip.index].data), c => c.charCodeAt(0)));
+      await ffmpeg.run(
+        '-loop', '1', '-t', dur, '-i', `raw_${padded}.png`,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+        '-s', '1280x720', '-r', '30', '-an', '-y', segOut
+      );
     }
   }
 
-  zip.file('filelist.txt', fileList.join('\n'));
+  // Pass 2 — concat all segments + overlay narration
+  const filelistTxt = videoClips.map((_, i) => `file 'seg_${String(i + 1).padStart(2, '0')}.mp4'`).join('\n');
+  ffmpeg.FS('writeFile', 'filelist.txt', new TextEncoder().encode(filelistTxt));
 
-  const ffmpegCmd = `ffmpeg -f concat -safe 0 -i filelist.txt -i narration.wav -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest -y output.mp4`;
-  zip.file('ffmpeg_stitch.txt', ffmpegCmd);
-  get('compiler-ffmpeg-cmd').value = ffmpegCmd;
+  _cstepSet('package', 'running', 'Stitching video with narration…');
+  await ffmpeg.run(
+    '-f', 'concat', '-safe', '0', '-i', 'filelist.txt',
+    '-i', 'narration.wav',
+    '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', 'output.mp4'
+  );
 
-  const zipBlob = await zip.generateAsync({ type: 'blob' });
-  const videoTitle = get('compiler-title').value.trim() || 'video';
-  get('compiler-download-btn').onclick = () => {
+  const outputData = ffmpeg.FS('readFile', 'output.mp4');
+  const mp4Blob    = new Blob([outputData.buffer], { type: 'video/mp4' });
+  const mp4Url     = URL.createObjectURL(mp4Blob);
+
+  const dlBtn = get('compiler-download-btn');
+  dlBtn.disabled    = false;
+  dlBtn.textContent = '⬇ Download MP4';
+  dlBtn.onclick     = () => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(zipBlob);
-    a.download = `${videoTitle}_package.zip`;
-    a.click();
+    a.href = mp4Url; a.download = `${videoTitle}.mp4`; a.click();
   };
-  get('compiler-copy-ffmpeg-btn').onclick = () => { copyText(ffmpegCmd); showToast('FFmpeg command copied!'); };
-  get('compiler-results').style.display = 'block';
-  _cstepSet('package', 'done', 'Package ready — download ZIP then run the FFmpeg command');
 
+  _cstepSet('package', 'done', `✅ MP4 ready — ${mm}m ${ss}s · ${videoClips.length} scenes`);
   btn.disabled = false;
   btn.textContent = '▶ Run Full Compiler';
-  get('compiler-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('Done! Download ZIP and run the FFmpeg command to get your MP4.', 'success');
+  showToast('MP4 ready — click Download MP4!', 'success');
 }
 
 async function _compilerSegmentWithGemini(script, stylePrefix, wps) {
