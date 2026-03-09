@@ -622,6 +622,18 @@ function initListeners() {
     showToast('Saved to Projects!');
   });
 
+  // Shorts Analyser
+  get('analyze-shorts-btn').addEventListener('click', analyzeShorts);
+  get('copy-shorts-btn').addEventListener('click', () => copyText(get('shorts-script-text').textContent));
+  get('save-shorts-btn').addEventListener('click', () => {
+    const title  = get('shorts-title-display').textContent;
+    const script = get('shorts-script-text').textContent;
+    if (!script) return;
+    const project = { id: Date.now(), title: title || 'Shorts Script', notes: script, date: new Date().toLocaleDateString() };
+    const projects = getProjects(); projects.unshift(project); setProjects(projects);
+    showToast('Saved to Projects!');
+  });
+
   // Other / Other Niche
   get('analyze-video-btn').addEventListener('click', analyzeReferenceVideo);
   get('more-topics-btn').addEventListener('click', generateMoreTopicIdeas);
@@ -2844,6 +2856,134 @@ async function fetchVideoMeta(videoUrl) {
       channelLink: d.author_url   || videoUrl,
     };
   } catch { return {}; }
+}
+
+async function analyzeShorts() {
+  const url = get('shorts-url').value.trim();
+  if (!url) return showToast('Paste a YouTube Shorts URL first.', 'error');
+  if (!url.includes('youtube.com') && !url.includes('youtu.be')) return showToast('Please use a YouTube URL.', 'error');
+
+  const btn        = get('analyze-shorts-btn');
+  const outputWrap = get('shorts-output');
+  const resultEl   = get('shorts-analysis-result');
+  const scriptSec  = get('shorts-script-section');
+
+  const showInline = (msg, isError) => {
+    resultEl.innerHTML = `<div style="font-size:12px;color:${isError ? '#f87171' : '#9ca3af'};padding:8px 0;">${msg}</div>`;
+    outputWrap.style.display = 'flex';
+  };
+
+  btn.disabled = true;
+  scriptSec.style.display = 'none';
+
+  // ── Step 1: Fetch metadata ────────────────────────────────────────────
+  showInline('Looking up Short…');
+  const meta = await fetchVideoMeta(url);
+  const knownTitle   = meta.videoTitle  || '';
+  const knownChannel = meta.channelName || '';
+
+  // ── Step 2: Get transcript ────────────────────────────────────────────
+  btn.querySelector('span').textContent = 'Extracting transcript…';
+  showInline('Extracting transcript…');
+
+  let transcriptText = '';
+
+  const supadataKey = getSupadataKey();
+  if (supadataKey) {
+    const tr = await fetchYouTubeTranscript(url);
+    if (!tr.error) transcriptText = tr.text || '';
+  }
+
+  if (!transcriptText) {
+    showInline('Extracting transcript via Gemini…');
+    const geminiTr = await callGeminiWithVideo(
+      url,
+      'You are a transcription assistant. Output only the spoken words from the video — no timestamps, no labels, no commentary.',
+      'Transcribe every word spoken in this video in full. Output only the transcript text, nothing else.'
+    );
+    if (!geminiTr.error) transcriptText = geminiTr.text.trim();
+  }
+
+  if (!transcriptText) {
+    btn.disabled = false;
+    btn.querySelector('span').textContent = 'Analyse Short';
+    showInline('Could not extract transcript. Make sure it is a public Short with captions.', true);
+    return;
+  }
+
+  const wordCount = transcriptText.split(/\s+/).filter(Boolean).length;
+
+  // ── Step 3: Show transcript ───────────────────────────────────────────
+  btn.querySelector('span').textContent = 'Writing script…';
+  showInline(`Transcript extracted (${wordCount} words) — generating matching script…`);
+
+  const titleBadge = knownTitle
+    ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(255,0,0,0.07);border:1px solid rgba(255,0,0,0.2);border-radius:8px;">
+        <div style="font-size:9px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Reference Short</div>
+        <div style="font-size:13px;font-weight:600;color:#fca5a5;line-height:1.4;">${escapeHTML(knownTitle)}</div>
+        ${knownChannel ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHTML(knownChannel)}</div>` : ''}
+      </div>` : '';
+
+  resultEl.innerHTML = titleBadge + `
+    <div style="font-size:10px;font-weight:700;color:#c084fc;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Reference Transcript</div>
+    <div style="padding:14px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.07);border-radius:10px;font-size:13px;color:#c4c9d4;line-height:2;white-space:pre-wrap;margin-bottom:4px;">${escapeHTML(transcriptText)}</div>
+    <div style="font-size:11px;color:#6b7280;">${wordCount} words · ~${Math.round(wordCount / 150)} min</div>`;
+  outputWrap.style.display = 'flex';
+
+  // ── Step 4: Generate matching-length script ───────────────────────────
+  const PROMPT = `You are a YouTube Shorts scriptwriter.
+
+REFERENCE SHORT TITLE: "${knownTitle || 'unknown'}"
+REFERENCE CHANNEL: "${knownChannel || 'unknown'}"
+
+REFERENCE TRANSCRIPT (${wordCount} words):
+---
+${transcriptText}
+---
+
+TASK:
+1. Write a NEW YouTube Shorts title in the exact same style as the reference title above.
+2. Write a NEW script for a different subject in the same niche and tone.
+
+STRICT RULE — WORD COUNT: Your script must be EXACTLY ${wordCount} words. Count carefully before outputting. Do not go over or under by more than 3 words.
+
+The script must:
+- Open with the same hook energy as the reference
+- Match the pacing, tone, and sentence length of the reference transcript
+- Be spoken narration only — no stage directions, no scene notes
+- Feel like it came from the same channel
+
+Output in EXACTLY this format — nothing else:
+
+TITLE: [your new title]
+
+SCRIPT:
+[your ${wordCount}-word script here]`;
+
+  const result = await callGemini('You are a YouTube Shorts scriptwriter. Follow all instructions precisely.', PROMPT);
+
+  btn.disabled = false;
+  btn.querySelector('span').textContent = 'Analyse Short';
+
+  if (result.error) {
+    showInline(`Script generation failed: ${result.error}`, true);
+    return;
+  }
+
+  const titleMatch  = result.text.match(/TITLE:\s*(.+)/i);
+  const scriptMatch = result.text.match(/SCRIPT:\s*([\s\S]+)/i);
+  const newTitle    = titleMatch?.[1]?.trim()  || 'Generated Short';
+  const newScript   = scriptMatch?.[1]?.trim() || result.text;
+  const newWordCount = newScript.split(/\s+/).filter(Boolean).length;
+
+  get('shorts-title-display').textContent = newTitle;
+  get('shorts-script-text').textContent   = newScript;
+  get('shorts-script-section').style.display = 'block';
+
+  const wDiff = newWordCount - wordCount;
+  const diffLabel = wDiff === 0 ? '✅ Exact match' : (wDiff > 0 ? `+${wDiff} words` : `${wDiff} words`);
+  get('shorts-script-section').querySelector('div[style*="10px"]').textContent =
+    `Generated Script — ${newWordCount} words (${diffLabel} vs ${wordCount} reference)`;
 }
 
 async function analyzeReferenceVideo() {

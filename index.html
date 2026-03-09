@@ -613,6 +613,55 @@
           </div>
         </div>
 
+        <!-- Shorts Analyser -->
+        <div class="analyser-card" style="margin-top:16px;">
+          <div class="analyser-header">
+            <div class="analyser-yt-badge" style="background:rgba(255,0,0,0.12);border-color:rgba(255,0,0,0.25);">
+              <svg width="12" height="18" viewBox="0 0 12 18" fill="none"><rect x="0" y="0" width="12" height="18" rx="3" fill="#FF0000"/><path d="M4.5 5.5L8.5 9L4.5 12.5V5.5Z" fill="white"/></svg>
+            </div>
+            <div>
+              <h3 class="analyser-title">Shorts Analyser</h3>
+              <p class="analyser-subtitle">Paste a Shorts URL — get its transcript, then a matching-length script</p>
+            </div>
+          </div>
+          <div class="analyser-pills">
+            <span class="analyser-pill">📝 Transcribes</span>
+            <span class="analyser-pill">✂️ Matches length</span>
+            <span class="analyser-pill">✍️ Writes script</span>
+          </div>
+          <div class="analyser-search-wrap">
+            <div class="analyser-search-bar">
+              <svg class="analyser-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="url" id="shorts-url" class="analyser-search-input" placeholder="Paste a YouTube Shorts link…" autocomplete="off" spellcheck="false" />
+              <button class="analyser-clear-btn" onclick="const el=document.getElementById('shorts-url');el.value='';el.focus();" title="Clear">✕</button>
+            </div>
+            <button class="analyser-analyse-btn" id="analyze-shorts-btn">
+              <span>Analyse Short</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <p class="analyser-footnote">Public Shorts only &nbsp;·&nbsp; Output script matches transcript word count exactly</p>
+        </div>
+
+        <!-- Shorts output -->
+        <div class="ccp-output" id="shorts-output" style="display:none;margin-top:16px;">
+          <div class="ccp-output-header">
+            <span class="ccp-output-label">Shorts Breakdown</span>
+          </div>
+          <div class="ccp-output-body" style="padding:14px;">
+            <div id="shorts-analysis-result"></div>
+            <div id="shorts-script-section" style="display:none;margin-top:20px;">
+              <div style="font-size:10px;font-weight:700;color:#c084fc;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Generated Script</div>
+              <div id="shorts-title-display" style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:12px;"></div>
+              <div id="shorts-script-text" class="ccp-output-text" style="white-space:pre-wrap;"></div>
+              <div class="ccp-btn-row" style="margin-top:12px;">
+                <button class="ccp-btn copy" id="copy-shorts-btn">📋 Copy Script</button>
+                <button class="ccp-btn save" id="save-shorts-btn">💾 Save to Project</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Step 3: Script generation (hidden until topic selected) -->
         <div id="other-script-section" style="display:none;margin-top:16px;">
           <div class="glass-card">
