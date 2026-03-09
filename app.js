@@ -4240,18 +4240,11 @@ function _cstepSet(id, state, subText) {
 }
 
 async function runVideoCompiler() {
-  const videoUrl = get('compiler-url').value.trim();
-  const script   = get('compiler-script').value.trim();
-  const voice    = get('compiler-voice').value;
-  const wps      = parseFloat(get('compiler-wps').value) || 2.5;
+  const voice = get('compiler-voice').value;
 
-  if (!videoUrl && !_styleRefImgData) return showToast('Paste a reference video URL or upload a style reference image first.', 'error');
-  if (!script)   return showToast('Paste your finished script first.', 'error');
   if (!hasApiAccess()) return showToast('Add your Gemini API key in Settings.', 'error');
 
-  _compilerSegments   = [];
-  _compilerStyleGuide = '';
-  _compilerWavBlob    = null;
+  _compilerWavBlob = null;
 
   const btn = get('run-compiler-btn');
   btn.disabled = true;
@@ -4262,249 +4255,163 @@ async function runVideoCompiler() {
   get('compiler-progress').scrollIntoView({ behavior: 'smooth', block: 'start' });
   ['style','segment','images','video','tts','package'].forEach(s => _cstepSet(s, 'pending', 'Waiting…'));
 
-  // ── Step 1: Style extraction ───────────────────────────────────────────
-  const _styleExtractSYS = 'You are a creative director specialising in YouTube animation. You analyse references and produce precise, replicable animation style guides that can be used to recreate the exact visual look of every frame.';
-  const _styleExtractUSER = `Analyse this reference carefully.
-
-Extract an ANIMATION STYLE GUIDE in exactly this format:
-
-ART STYLE: [e.g. flat 2D vector / 3D animation / motion graphics / live action + graphics]
-COLOUR PALETTE: [list dominant colours with descriptions, e.g. "deep navy #1a1a2e, bright red #e94560, white text on dark"]
-CHARACTER DESIGN: [e.g. simple black silhouettes / no faces / detailed cartoon characters / stick figures]
-BACKGROUND STYLE: [e.g. solid dark colour / illustrated environments / real photos / gradient washes]
-TEXT OVERLAYS: [font style, placement, colour, size, how frequently they appear]
-CAMERA MOVEMENT: [e.g. slow zoom in / static wide / pan left-right / pull back reveal]
-TRANSITION STYLE: [e.g. hard cut / fade to black between segments / whip pan / slide wipe]
-LIGHTING: [e.g. high contrast dramatic / flat even / glowing neon accents / cinematic dark]
-MOOD: [e.g. ominous and tense / upbeat educational / cinematic epic / clinical and cold]
-PACING: [e.g. new visual every 4-6 seconds / holds on image during narration / rapid cuts every 2s]
-
-RECREATION PROMPT BASE: [Write a single reusable image generation prompt — 3 to 5 sentences — that captures ALL of the above. This will be prepended to every scene description to guarantee every frame looks like it came from the same video. Be highly specific about colours, art style, rendering technique, and mood.]`;
-
-  let styleResult;
-  if (_styleRefImgData) {
-    // Use uploaded style reference image instead of video URL
-    _cstepSet('style', 'running', 'Scanning style image…');
-    const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
-    try {
-      const apiResp = await _geminiFetch(model, {
-          system_instruction: { parts: [{ text: _styleExtractSYS }] },
-          contents: [{ parts: [
-            { inlineData: { mimeType: _styleRefImgMime, data: _styleRefImgData } },
-            { text: _styleExtractUSER }
-          ]}],
-          generationConfig: { maxOutputTokens: 2048, temperature: 0.3 }
-        });
-      if (!apiResp.ok) {
-        const err = await apiResp.json().catch(() => ({}));
-        styleResult = { error: err?.error?.message || `HTTP ${apiResp.status}` };
-      } else {
-        const data = await apiResp.json();
-        const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-        styleResult = text ? { text } : { error: 'No style extracted from image.' };
-      }
-    } catch (e) {
-      styleResult = { error: e.message };
-    }
-  } else {
-    _cstepSet('style', 'running', 'Watching video…');
-    styleResult = await callGeminiWithVideo(videoUrl, _styleExtractSYS, _styleExtractUSER);
-  }
-
-  if (styleResult.error) {
-    _cstepSet('style', 'error', styleResult.error);
-    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
-    return showToast('Style extraction failed.', 'error');
-  }
-  _compilerStyleGuide = styleResult.text;
-  currentOtherVisualStyleGuide = styleResult.text;
-  const baseMatch  = styleResult.text.match(/RECREATION PROMPT BASE[:\s]+(.+)/i);
-  const stylePrefix = baseMatch ? baseMatch[1].trim() : '';
-  _cstepSet('style', 'done', 'Style extracted');
-
-  // ── Step 2: Script segmentation via Gemini ────────────────────────────
-  _cstepSet('segment', 'running', 'Analysing script…');
-  let segments = await _compilerSegmentWithGemini(script, stylePrefix, wps);
-  if (!segments.length) {
-    // Fallback to pure-JS parser if Gemini fails or script has no markers
-    segments = _compilerParseSegments(script, stylePrefix, wps);
-  }
-  if (!segments.length) {
-    _cstepSet('segment', 'error', 'No segments found. Add [VOICEOVER] and [ANIMATION NOTE] markers to your script.');
-    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
-    return showToast('Add [VOICEOVER] and [ANIMATION NOTE] markers to your script first.', 'error');
-  }
-  _compilerSegments = segments;
-  const totalDur = segments.reduce((s, seg) => s + seg.duration, 0);
-  _cstepSet('segment', 'done', `${segments.length} segments · ${Math.round(totalDur)}s total`);
-
-  // Show results section and render segment cards immediately
-  get('compiler-style-output').textContent = _compilerStyleGuide;
-  _compilerRenderSegmentList(segments);
-  get('compiler-results').style.display = 'block';
-
-  // ── Step 3: Images — pull from DOM / localStorage, generate only what's missing ──
-  _cstepSet('images', 'running', `Processing 0 / ${segments.length}…`);
-
-  // Collect already-rendered images from Image Planner DOM (most current source)
-  const _domImages = [];
-  document.querySelectorAll('.beat-image').forEach(img => {
+  // ── Step 1: Collect images from Image Planner tab ─────────────────────
+  _cstepSet('style', 'running', 'Loading images from Image Planner…');
+  const existingImages = [];
+  document.querySelectorAll('.beat-image, .img-result img, .image-result img, .scene-img img, [data-image] img').forEach(img => {
     if (img.src && img.src.startsWith('data:')) {
-      const comma = img.src.indexOf(',');
-      const mime  = img.src.slice(5, img.src.indexOf(';')) || 'image/png';
-      _domImages.push({ data: img.src.slice(comma + 1), mime });
-    }
-  });
-
-  // Collect Veo 3 prompts from DOM (most current source)
-  const _domVeo3 = [];
-  document.querySelectorAll('.veo3-prompt').forEach(el => {
-    _domVeo3.push(el.textContent.trim());
-  });
-
-  // Fallback to localStorage if DOM is empty (e.g. user navigated away)
-  const _lsImages = _domImages.length ? null : getBeatImages(currentNiche || 'other');
-  const _lsVeo3   = _domVeo3.length   ? null : getVeo3Prompts(currentNiche || 'other');
-
-  // Assign Veo 3 prompts to segments
-  for (let i = 0; i < segments.length; i++) {
-    const v3 = _domVeo3[i] || _lsVeo3?.[i]?.text || '';
-    if (v3) segments[i].veo3Motion = v3;
-  }
-
-  let imgFlagged = 0, imgReused = 0;
-  await Promise.all(segments.map(async (seg, _si) => {
-    // Try DOM image first, then localStorage fallback
-    const domImg = _domImages[_si];
-    const lsImg  = _lsImages ? _lsImages[_si + 1] : null;
-    if (domImg?.data || lsImg?.data) {
-      const src = domImg || lsImg;
-      seg.imageData   = src.data;
-      seg.imageMime   = src.mime || 'image/png';
-      seg.imageError  = null;
-      seg.imageReused = true;
-      imgReused++;
-      _compilerUpdateSegmentImage(seg);
-      return;
-    }
-
-    // No pre-existing image — generate one
-    let r = await nanoBananaRender({ prompt: seg.imagePrompt });
-
-    if (!r.error && r.imageData) {
-      const check = await _compilerVerifyImage(r.imageData, r.mimeType, _compilerStyleGuide, seg.animNote);
-      if (!check.pass && check.correctedPrompt) {
-        imgFlagged++;
-        seg.imageFlagged = true;
-        seg.flagReason   = check.reason || 'Style deviation detected';
-        const r2 = await nanoBananaRender({ prompt: check.correctedPrompt });
-        if (!r2.error && r2.imageData) {
-          r = r2;
-          seg.imageCorrected  = true;
-          seg.correctedPrompt = check.correctedPrompt;
-        }
-      }
-    }
-
-    seg.imageData  = r.imageData || null;
-    seg.imageMime  = r.mimeType  || 'image/png';
-    seg.imageError = r.error     || null;
-    _compilerUpdateSegmentImage(seg);
-  }));
-  const imgDone   = segments.filter(s => s.imageData).length;
-  const reuseNote = imgReused ? ` · ${imgReused} from Image Planner` : '';
-  const flagNote  = imgFlagged ? ` · ${imgFlagged} corrected` : '';
-  _cstepSet('images', 'done', `${imgDone} images ready${reuseNote}${flagNote}`);
-
-  // ── Step 3.5: Veo 3 video clip generation ────────────────────────────
-  _cstepSet('video', 'running', `Generating video clips…`);
-  let videosDone = 0, videosSkipped = 0;
-  const _veoApiKey = await _getApiKey();
-  for (let _vi = 0; _vi < segments.length; _vi++) {
-    const seg = segments[_vi];
-    if (!seg.imageData) { videosSkipped++; continue; }
-    _cstepSet('video', 'running', `Generating clip ${_vi + 1} / ${segments.length}…`);
-    try {
-      const veoEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:generateContent?key=${_veoApiKey}`;
-      const veoRes = await fetch(veoEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { inlineData: { mimeType: seg.imageMime, data: seg.imageData } },
-            { text: seg.veo3Motion || 'Slow cinematic motion, subtle camera movement' }
-          ]}],
-          generationConfig: { durationSeconds: Math.min(Math.round(seg.duration), 8) }
-        })
+      existingImages.push({
+        data: img.src.split(',')[1],
+        mime: img.src.split(';')[0].split(':')[1] || 'image/png',
+        prompt: img.alt || ''
       });
-      const veoData = await veoRes.json();
-      const videoPart = veoData?.candidates?.[0]?.content?.parts?.[0];
-      const videoBytes = videoPart?.fileData || videoPart?.inlineData;
-      if (videoBytes?.data) {
-        seg.videoData = videoBytes.data;
-        seg.videoMime = videoBytes.mimeType || 'video/mp4';
-        videosDone++;
-      } else {
-        videosSkipped++;
-      }
-    } catch (e) {
-      seg.videoError = e.message;
-      videosSkipped++;
     }
-  }
-  if (videosDone > 0) {
-    _cstepSet('video', 'done', `${videosDone} clips generated · ${videosSkipped} used still image`);
-  } else {
-    _cstepSet('video', 'done', `No clips generated — still images will be used with Ken Burns zoom`);
+  });
+
+  // Also try localStorage fallback
+  if (!existingImages.length) {
+    const lsImgs = getBeatImages(currentNiche || 'other');
+    Object.values(lsImgs).forEach(img => { if (img?.data) existingImages.push(img); });
   }
 
-  // ── Step 4: TTS narration ─────────────────────────────────────────────
+  if (!existingImages.length) {
+    _cstepSet('style', 'error', 'No images found');
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast('No images found. Run the Image Planner and render your beats first.', 'error');
+  }
+  _cstepSet('style', 'done', `${existingImages.length} images loaded`);
+
+  // ── Step 2: Collect Veo 3 prompts from Veo 3 tab ─────────────────────
+  _cstepSet('segment', 'running', 'Loading Veo 3 prompts…');
+  const veo3Prompts = [];
+  document.querySelectorAll('.veo3-prompt').forEach(el => veo3Prompts.push(el.textContent.trim()));
+
+  if (!veo3Prompts.length) {
+    const lsVeo3 = getVeo3Prompts(currentNiche || 'other');
+    lsVeo3.forEach(p => { if (p?.text) veo3Prompts.push(p.text); });
+  }
+
+  if (!veo3Prompts.length) {
+    _cstepSet('segment', 'error', 'No Veo 3 prompts found');
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast('No Veo 3 prompts found. Run the Veo 3 Prompts tab first.', 'error');
+  }
+  _cstepSet('segment', 'done', `${veo3Prompts.length} motion prompts loaded`);
+
+  // ── Step 3: TTS narration ─────────────────────────────────────────────
   _cstepSet('tts', 'running', 'Generating narration…');
-  const voiceoverText = segments.map(s => s.voiceover).filter(Boolean).join('\n\n');
+  const voiceoverText = get('compiler-script').value.trim();
+  if (!voiceoverText) {
+    _cstepSet('tts', 'error', 'No script found');
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast('Paste your finished script in the Script field first.', 'error');
+  }
   const ttsResult = await _compilerRunTTS(voiceoverText, voice);
   if (ttsResult.error) {
     _cstepSet('tts', 'error', ttsResult.error);
-  } else {
-    _compilerWavBlob = ttsResult.blob;
-    const audioUrl = URL.createObjectURL(ttsResult.blob);
-    get('compiler-audio').src = audioUrl;
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast(`TTS failed: ${ttsResult.error}`, 'error');
+  }
+  _compilerWavBlob = ttsResult.blob;
+  const audioUrl = URL.createObjectURL(ttsResult.blob);
+  get('compiler-audio').src = audioUrl;
+  const audioDuration = await new Promise(resolve => {
+    const a = new Audio(audioUrl);
+    a.addEventListener('loadedmetadata', () => resolve(a.duration));
+    a.addEventListener('error', () => resolve(0));
+    a.load();
+  });
+  const clipDuration = audioDuration > 0
+    ? Math.max(4, Math.min(8, audioDuration / existingImages.length))
+    : 6;
+  const mm = Math.floor(audioDuration / 60);
+  const ss = Math.round(audioDuration % 60);
+  _cstepSet('tts', 'done', `Narration ready · ${mm}m ${ss}s`);
 
-    // Measure real audio duration and rescale segment timings to match exactly
-    const audioDuration = await new Promise(resolve => {
-      const audio = new Audio(audioUrl);
-      audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
-      audio.addEventListener('error', () => resolve(0));
-      audio.load();
-    });
+  // ── Step 4: Convert every image to a Veo 3 video clip (parallel) ──────
+  _cstepSet('images', 'running', `Converting ${existingImages.length} images to video clips…`);
+  const _veoKey = await _getApiKey();
+  const videoClips = await Promise.all(existingImages.map(async (img, i) => {
+    const motionPrompt = veo3Prompts[i] || 'Slow cinematic motion, subtle zoom, atmospheric lighting';
+    try {
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: _veoKey,
+          model: 'veo-2.0-generate-001',
+          payload: {
+            contents: [{ parts: [
+              { inlineData: { mimeType: img.mime, data: img.data } },
+              { text: motionPrompt }
+            ]}],
+            generationConfig: {
+              durationSeconds: Math.round(clipDuration),
+              aspectRatio: '16:9'
+            }
+          }
+        })
+      });
+      const data = await res.json();
+      const part = data?.candidates?.[0]?.content?.parts?.[0];
+      const videoData = part?.inlineData || part?.fileData;
+      return { index: i, data: videoData?.data || null, mime: videoData?.mimeType || 'video/mp4', error: videoData ? null : (data?.error?.message || 'No video returned') };
+    } catch (e) {
+      return { index: i, data: null, mime: 'video/mp4', error: e.message };
+    }
+  }));
+  const successCount = videoClips.filter(c => c.data).length;
+  _cstepSet('images', 'done', `${successCount}/${existingImages.length} clips generated`);
+  _cstepSet('video', 'done', successCount < existingImages.length ? `${existingImages.length - successCount} fell back to still image` : 'All clips ready');
 
-    if (audioDuration > 0) {
-      const estimatedTotal = segments.reduce((s, seg) => s + seg.duration, 0);
-      const scale = audioDuration / estimatedTotal;
-      segments.forEach(seg => { seg.duration = Math.round(seg.duration * scale * 10) / 10; });
-      const realTotal = segments.reduce((s, seg) => s + seg.duration, 0);
-      console.log(`Audio: ${audioDuration}s | Estimated: ${estimatedTotal}s | Scaled: ${realTotal}s`);
-      const mm = Math.floor(audioDuration / 60);
-      const ss = Math.round(audioDuration % 60);
-      _cstepSet('tts', 'done', `Narration ready · ${mm}m ${ss}s total video length`);
+  // ── Step 5: Build ZIP with clips + narration + FFmpeg stitch command ───
+  _cstepSet('package', 'running', 'Building video package…');
+  const JSZip = window.JSZip;
+  if (!JSZip) {
+    _cstepSet('package', 'error', 'JSZip not available');
+    btn.disabled = false; btn.textContent = '▶ Run Full Compiler';
+    return showToast('JSZip unavailable — reload the page and try again.', 'error');
+  }
+  const zip = new JSZip();
+
+  zip.file('narration.wav', await _compilerWavBlob.arrayBuffer());
+
+  const fileList = [];
+  for (const clip of videoClips) {
+    const padded = String(clip.index + 1).padStart(2, '0');
+    if (clip.data) {
+      const bytes = Uint8Array.from(atob(clip.data), c => c.charCodeAt(0));
+      zip.file(`clip_${padded}.mp4`, bytes);
+      fileList.push(`file 'clip_${padded}.mp4'`);
     } else {
-      _cstepSet('tts', 'done', 'Narration ready');
+      const bytes = Uint8Array.from(atob(existingImages[clip.index].data), c => c.charCodeAt(0));
+      zip.file(`clip_${padded}.png`, bytes);
+      fileList.push(`file 'clip_${padded}.png'`);
     }
   }
 
-  // ── Step 5: Build package ─────────────────────────────────────────────
-  _cstepSet('package', 'running', 'Building package…');
-  const videoTitle  = get('compiler-title').value.trim() || 'Untitled Video';
-  const ffmpegCmd   = _compilerBuildFFmpegCmd(voice, segments);
-  const filelistTxt = _compilerBuildFileList(segments);
+  zip.file('filelist.txt', fileList.join('\n'));
+
+  const ffmpegCmd = `ffmpeg -f concat -safe 0 -i filelist.txt -i narration.wav -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest -y output.mp4`;
+  zip.file('ffmpeg_stitch.txt', ffmpegCmd);
   get('compiler-ffmpeg-cmd').value = ffmpegCmd;
-  get('compiler-download-btn').onclick = () => _compilerDownloadZip(segments, videoTitle, ffmpegCmd, filelistTxt, voice);
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const videoTitle = get('compiler-title').value.trim() || 'video';
+  get('compiler-download-btn').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = `${videoTitle}_package.zip`;
+    a.click();
+  };
   get('compiler-copy-ffmpeg-btn').onclick = () => { copyText(ffmpegCmd); showToast('FFmpeg command copied!'); };
-  _cstepSet('package', 'done', 'Package ready — download below');
+  get('compiler-results').style.display = 'block';
+  _cstepSet('package', 'done', 'Package ready — download ZIP then run the FFmpeg command');
 
   btn.disabled = false;
   btn.textContent = '▶ Run Full Compiler';
   get('compiler-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('Compilation complete!', 'success');
+  showToast('Done! Download ZIP and run the FFmpeg command to get your MP4.', 'success');
 }
 
 async function _compilerSegmentWithGemini(script, stylePrefix, wps) {
