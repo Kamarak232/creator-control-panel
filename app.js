@@ -70,7 +70,6 @@ function setProjects(projects) {
 
 // ─── Gemini Text API ──────────────────────────────────────────────────────
 async function callGemini(systemPrompt, userPrompt) {
-  const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
   const model = localStorage.getItem('model') || GEMINI_TEXT_MODEL;
@@ -146,7 +145,6 @@ async function callGemini(systemPrompt, userPrompt) {
 
 // ─── Gemini Image Generation (Nano Banana) ────────────────────────────────
 async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
-  const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
   // Always inject style reference image first so every render is style-locked
@@ -219,7 +217,6 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
 
 // ─── Gemini TTS ───────────────────────────────────────────────────────────
 async function geminiTTS({ text, voice }) {
-  const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
   try {
@@ -2709,7 +2706,6 @@ COLOUR ASSIGNMENT — [Territory]: [colour hex or name]`;
 // ─── Other / Other Niche ───────────────────────────────────────────────
 
 async function callGeminiWithVideo(youtubeUrl, systemPrompt, userPrompt) {
-  const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
   // Normalise short URLs: youtu.be/ID → youtube.com/watch?v=ID
@@ -3743,7 +3739,7 @@ async function _geminiRequest(model, body) {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       const msg = err?.error?.message || `HTTP ${response.status}`;
-      console.warn('[gemini]', url.split('/').pop().split(':')[0], response.status, msg);
+      console.warn('[gemini]', model, response.status, msg);
       return { status: response.status, msg };
     }
     const data = await response.json();
@@ -3764,8 +3760,9 @@ async function _geminiRequest(model, body) {
 
 // Gemini call with Google Search grounding — tries multiple models, falls back to no-search
 async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
-  const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
+  const apiKey = await _getApiKey();
+  if (!apiKey) return { error: 'No API key found. Add your Gemini API key in ⚙️ Settings.' };
 
   const MODELS = ['gemini-2.5-flash'];
 
