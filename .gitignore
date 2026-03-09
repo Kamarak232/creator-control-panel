@@ -1,0 +1,12 @@
+# Environment variables — never commit API keys
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
