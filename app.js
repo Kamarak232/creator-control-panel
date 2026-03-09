@@ -3767,17 +3767,16 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
-  const MODELS = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-preview-04-17',
-    'gemini-2.5-flash',
-  ];
+  const MODELS = ['gemini-2.5-flash'];
 
   const makeBody = (withSearch) => ({
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
     ...(withSearch ? { tools: [{ googleSearch: {} }] } : {}),
-    generationConfig: { maxOutputTokens: 16384, temperature }
+    generationConfig: {
+      maxOutputTokens: 16384,
+      temperature,
+      thinkingConfig: { thinkingBudget: 0 }
+    }
   });
 
   // Pass 1: with Google Search grounding
