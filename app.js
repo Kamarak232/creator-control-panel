@@ -149,13 +149,29 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
   const geminiKey = getGeminiKey();
   if (!hasApiAccess()) return { error: 'Add your Gemini API key in ⚙️ Settings.' };
 
-  const parts = [];
-  if (referenceImages?.length) {
-    for (const ref of referenceImages) {
-      if (ref.data && ref.mime) parts.push({ inlineData: { mimeType: ref.mime, data: ref.data } });
-    }
+  // Always inject style reference image first so every render is style-locked
+  const allRefs = [];
+  if (_styleRefImgData && _styleRefImgMime) {
+    const alreadyIncluded = referenceImages?.some(r => r.data === _styleRefImgData);
+    if (!alreadyIncluded) allRefs.push({ data: _styleRefImgData, mime: _styleRefImgMime });
   }
-  parts.push({ text: prompt });
+  if (referenceImages?.length) allRefs.push(...referenceImages);
+
+  // Prepend RECREATION PROMPT BASE to every prompt that doesn't already have a STYLE LOCK
+  const _styleSource = currentOtherVisualStyleGuide || _compilerStyleGuide || localStorage.getItem('styleGuide') || '';
+  const _recBase = _styleSource.match(/RECREATION PROMPT BASE[:\s]+(.+)/is)?.[1]?.trim() || '';
+  const hasStyleLock = /STYLE LOCK/i.test(prompt);
+  const finalPrompt = (!hasStyleLock && _recBase)
+    ? `STYLE LOCK — replicate this exact visual style in every detail: ${_recBase}\n\nScene to render:\n${prompt}`
+    : (!hasStyleLock && _styleReferencePromptOther)
+      ? `STYLE LOCK — apply this style to every pixel: ${_styleReferencePromptOther}\n\nScene to render:\n${prompt}`
+      : prompt;
+
+  const parts = [];
+  for (const ref of allRefs) {
+    if (ref.data && ref.mime) parts.push({ inlineData: { mimeType: ref.mime, data: ref.data } });
+  }
+  parts.push({ text: finalPrompt });
 
   try {
     const response = await _geminiFetch('gemini-2.5-flash-image', {
@@ -173,7 +189,7 @@ async function nanoBananaRender({ prompt, referenceImages }, _attempt = 0) {
         const waitSec = Math.ceil(parseFloat(retryMatch[1])) + 2;
         showToast(`⏳ Rate limit — waiting ${waitSec}s then retrying…`, 'info');
         await new Promise(r => setTimeout(r, waitSec * 1000));
-        return nanoBananaRender({ prompt, referenceImages }, _attempt + 1);
+        return nanoBananaRender({ prompt, referenceImages: allRefs }, _attempt + 1);
       }
       // Quota exhausted (no retry time given) — billing limit, retrying won't help
       const isQuotaExhausted = /quota|rate.?limit|429/i.test(msg) || response.status === 429;
