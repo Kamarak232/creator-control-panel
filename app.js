@@ -4758,7 +4758,7 @@ async function _compilerRunTTS(text, voice) {
   const chunks = []; let cur = '', wc = 0;
   for (const s of sentences) {
     const w = s.trim().split(/\s+/).length;
-    if (wc + w > 600 && cur) { chunks.push(cur.trim()); cur = s; wc = w; }
+    if (wc + w > 150 && cur) { chunks.push(cur.trim()); cur = s; wc = w; }
     else { cur += s; wc += w; }
   }
   if (cur.trim()) chunks.push(cur.trim());
@@ -4768,9 +4768,15 @@ async function _compilerRunTTS(text, voice) {
     const wordCount = chunks[i].split(/\s+/).length;
     _cstepSet('tts', 'running', `Part ${i + 1} of ${chunks.length} (${wordCount} words)…`);
     console.log(`[TTS] chunk ${i + 1}/${chunks.length}, ${wordCount} words`);
-    const r = await geminiTTS({ text: chunks[i], voice });
+    let r = await geminiTTS({ text: chunks[i], voice });
     if (r.error) {
-      console.error(`[TTS] chunk ${i + 1} failed:`, r.error);
+      console.warn(`[TTS] chunk ${i + 1} failed, retrying once…`, r.error);
+      _cstepSet('tts', 'running', `Part ${i + 1} of ${chunks.length} — retrying…`);
+      await new Promise(res => setTimeout(res, 2000));
+      r = await geminiTTS({ text: chunks[i], voice });
+    }
+    if (r.error) {
+      console.error(`[TTS] chunk ${i + 1} failed after retry:`, r.error);
       _cstepSet('tts', 'error', `Part ${i + 1} failed: ${r.error}`);
       return { error: `Part ${i + 1} of ${chunks.length}: ${r.error}` };
     }
