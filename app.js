@@ -3765,29 +3765,23 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   const apiKey = await _getApiKey();
   if (!apiKey) return { error: 'No API key found. Add your Gemini API key in ⚙️ Settings.' };
 
-  // gemini-2.5-flash first; gemini-2.0-flash and gemini-1.5-flash as fallbacks
-  const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  // gemini-2.5-flash first; gemini-1.5-flash-latest as fallback
+  const MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash-latest'];
 
-  // thinkingConfig only on 2.5 models; 1.5 models don't support it
-  const makeBody = (model, withSearch) => {
-    const is25 = model.startsWith('gemini-2.5');
-    return {
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      ...(withSearch ? { tools: [{ googleSearch: {} }] } : {}),
-      generationConfig: {
-        maxOutputTokens: 16384,
-        temperature,
-        ...(is25 ? { thinkingConfig: { thinkingBudget: 0 } } : {})
-      }
-    };
-  };
+  // No thinkingConfig — 2.5-flash default dynamic thinking returns thought+text parts;
+  // _geminiRequest already strips thought parts and returns only text.
+  const makeBody = (withSearch) => ({
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    ...(withSearch ? { tools: [{ googleSearch: {} }] } : {}),
+    generationConfig: { maxOutputTokens: 16384, temperature }
+  });
 
   let lastErr = 'no response';
 
   // Pass 1: with Google Search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 3; i++) {
-      const res = await _geminiRequest(model, makeBody(model, true));
+      const res = await _geminiRequest(model, makeBody(true));
       if (!res) { lastErr = `${model}: thought-only`; console.warn('[search] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
@@ -3802,7 +3796,7 @@ async function callGeminiWithSearch(userPrompt, { temperature = 1.0 } = {}) {
   // Pass 2: fallback without search grounding
   for (const model of MODELS) {
     for (let i = 0; i < 2; i++) {
-      const res = await _geminiRequest(model, makeBody(model, false));
+      const res = await _geminiRequest(model, makeBody(false));
       if (!res) { lastErr = `${model}: thought-only`; console.warn('[search-no-grounding] null response from', model, 'attempt', i); continue; }
       if (res.blocked) return { error: `Blocked: ${res.blocked}` };
       if (res.text) return { text: res.text };
